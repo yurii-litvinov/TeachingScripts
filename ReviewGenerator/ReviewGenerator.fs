@@ -45,14 +45,14 @@ let main argv =
                         p1Score = line.[11]
                         p1Comment = line.[12]
                         p2Score = line.[13]
-                        p2Comment = line.[14]
-                        general = line.[15]
+                        p2Comment = if line.Length > 14 then line.[14] else ""
+                        general = if line.Length > 15 then line.[15] else ""
                     }
                     )
 
     works 
     |> Seq.iter(fun work ->
-        use file = new FileStream(work.name + ".txt", FileMode.Create)
+        use file = new FileStream(work.name.Replace('\"', ' ') + ".txt", FileMode.Create)
         use writer = new StreamWriter(file)
         writer.WriteLine("Здравствуйте.")
         writer.WriteLine()
@@ -61,52 +61,41 @@ let main argv =
 
         writer.WriteLine("О1. Соответствие содержания и оформления предъявленным требованиям:")
         writer.WriteLine(work.o1Score)
-        writer.WriteLine()
         writer.WriteLine(work.o1Comment)
-        writer.WriteLine()
         writer.WriteLine()
 
         writer.WriteLine("О2. Умение работать с информацией, опубликованной в научных и иных источниках:")
         writer.WriteLine(work.o2Score)
-        writer.WriteLine()
         writer.WriteLine(work.o2Comment)
-        writer.WriteLine()
         writer.WriteLine()
 
         writer.WriteLine("Т1. Обоснование принятых решений/Теоретический анализ:")
         writer.WriteLine(work.t1Score)
-        writer.WriteLine()
         writer.WriteLine(work.t1Comment)
-        writer.WriteLine()
         writer.WriteLine()
 
         writer.WriteLine("Т2. Сравнение с аналогами:")
         writer.WriteLine(work.t2Score)
-        writer.WriteLine()
         writer.WriteLine(work.t2Comment)
-        writer.WriteLine()
         writer.WriteLine()
 
         writer.WriteLine("П1. Качество практической части:")
         writer.WriteLine(work.p1Score)
         if work.p1Comment <> "" then
-            writer.WriteLine()
             writer.WriteLine(work.p1Comment)
-        writer.WriteLine()
         writer.WriteLine()
 
         writer.WriteLine("П2. Качество проводимых измерений и постановки экспериментов:")
         writer.WriteLine(work.p2Score)
         if work.p2Comment <> "" then
-            writer.WriteLine()
             writer.WriteLine(work.p2Comment)
         writer.WriteLine()
-        writer.WriteLine()
 
-        writer.WriteLine("Общий комментарий к работе:")
-        writer.WriteLine(work.general)
-        writer.WriteLine()
-        writer.WriteLine()
+        if work.general <> "" then
+            writer.WriteLine("Общий комментарий к работе:")
+            writer.WriteLine(work.general)
+
+        writer.WriteLine("Доработанный текст надо выложить в MS Teams и написать мне, что работа готова к повторному рецензированию")
 
         ()
         )
