@@ -41,18 +41,19 @@ let switchFilter filter =
 
 let switchTab tab =
     match tab with
-    | Teachers -> ! "/html/body/form/div[4]/div[5]/div[3]/div[2]/div[2]/div/div/div/div/ul/li[2]/div/ul/li[2]/a/span"
-    | Rooms -> ! "/html/body/form/div[4]/div[5]/div[3]/div[2]/div[2]/div/div/div/div/ul/li[2]/div/ul/li[7]/a/span"
+    | Teachers -> click (text "Преподаватели")
+    | Rooms -> click (text "Помещения для вида работы")
 
 let openRecord num =
     ! $"/html/body/form/div[4]/div[5]/div[3]/div[2]/div[2]/div/div[1]/table/tbody/tr/td/table[1]/tbody/tr[{num + 1}]/td[9]"
 
-let addRooms rooms =
+let addRooms rooms workTypes =
     switchTab Rooms
     let rooms = rooms |> Seq.map string
 
     for room in rooms do
-        for i in [2..4] do
+        for i in [2..(workTypes + 1)] do
+            sleep 2
             ! "/html/body/form/div[4]/div[5]/div[3]/div[2]/div[2]/div/div/div/div/div/div[3]/div/div/div/div/div[1]/table/tbody/tr/td[2]/div/div/div/div/div[1]/ul/li[1]/a/img"
             ! "/html/body/form/div[4]/div[2]/div[2]/div[2]/div/div/table[1]/tbody/tr[2]/td/div[2]/table/tbody/tr[2]/td/table/tbody/tr/td/div/div/table[1]/tbody/tr/td[2]/table/tbody/tr/td[3]/img"
             sleep 1
@@ -60,17 +61,18 @@ let addRooms rooms =
             sleep 1
             ! "/html/body/form/div[4]/div[2]/div[2]/div[2]/div/div/table[1]/tbody/tr[2]/td/div[3]/table/tbody/tr[2]/td/table/tbody/tr/td/table/tbody/tr/td[2]/table/tbody/tr/td[1]/input"
             (xpath "/html/body/form/div[4]/div[2]/div[2]/div[2]/div/div/table[1]/tbody/tr[2]/td/div[3]/table/tbody/tr[2]/td/table/tbody/tr/td/table/tbody/tr/td[2]/table/tbody/tr/td[1]/input") << room
-            sleep 3
+            sleep 5
             press enter
 
-let addTeacher teacher hours =
-    let workTypes = ["Под руководством преподавателя"; "Практические занятия"; "Промежуточная аттестация (зач)"]
+let addTeacher teacher workTypes hours =
     let workTypes = List.zip workTypes hours
 
     for workType in workTypes do
         click "#viewSite li[title^='Добавить'] img"
+        // Выпадающий список "Вид работ в модуле"
         ! "/html/body/form/div[4]/div[2]/div[2]/div[2]/div/div/table[1]/tbody/tr[2]/td/div[2]/table/tbody/tr[2]/td/table/tbody/tr/td/div/div/table[1]/tbody/tr/td[2]/table/tbody/tr/td[2]/input"
         sleep 1
+        // Получившаяся по клику на выпадающий список таблица
         let workTypeDropDown = element (xpath "/html/body/form/div[4]/div[2]/div[2]/div[2]/div/div/table[1]/tbody/tr[2]/td/div[2]/table/tbody/tr[2]/td/table/tbody/tr/td/div/div/table[1]/tbody/tr/td[2]/div/div/div/div/table/tbody/tr/td/div/div/table[2]")
         workTypeDropDown |> elementWithin (text (fst workType)) |> click
         click "#viewSite input[spellcheck=\"false\"]"
@@ -82,14 +84,69 @@ let addTeacher teacher hours =
         (xpath "/html/body/form/div[4]/div[2]/div[2]/div[2]/div/div/table[1]/tbody/tr[2]/td/table[2]/tbody/tr/td/div[1]/div/table/tbody/tr[2]/td/table/tbody/tr/td/table/tbody/tr/td[1]/input") << string (snd workType)
         press enter
 
-let wipeOutTeachers offset =
+let wipeOutTeachers () =
     switchTab Teachers
-    while elements "img[title='Отменить нагрузку']" |> Seq.length > 3 do
+    let length () = elements "img[title='Отменить нагрузку']" |> Seq.length
+    let mutable lastLength = length ()
+    let mutable isDone = false
+    let mutable offset = 0
+    while not isDone do
+        while ((length ()) = lastLength && offset < lastLength) do
+            let eraser = elements "img[title='Отменить нагрузку']" |> Seq.skip offset |> Seq.head
+            click eraser
+            sleep 2
+            if length () = lastLength then 
+                offset <- offset + 1
+        lastLength <- length ()
+        isDone <- offset >= lastLength
+
+let wipeOutRooms () =
+    switchTab Rooms
+    sleep 1
+    if (elements "span[title='Состояние выбранных строк на всех страницах']" |> Seq.length) > 1 then
+        sleep 1
+        elements "span[title='Состояние выбранных строк на всех страницах']" |> Seq.skip 1 |> Seq.head |> click
+        sleep 1
+        element "img[src*='Action_Delete']" |> click
+        sleep 1
+
+let removeWorkTypes offset count =
+    switchTab Teachers
+    sleep 1
+    for _ in [0..count - 1] do
         let eraser = elements "img[title='Отменить нагрузку']" |> Seq.skip offset |> Seq.head
         click eraser
         sleep 2
 
-let addTeachers teachers hours =
+let addTeachers teachers workTypes hours =
     switchTab Teachers
     for teacher in teachers do
-        addTeacher teacher hours
+        addTeacher teacher workTypes hours
+
+let addTypicalRecordWithoutOpening teachers workTypes hours rooms =
+    addTeachers 
+        teachers
+        workTypes
+        hours
+
+    sleep 1
+
+    click "img[src*='Action_Refresh']"
+
+    sleep 2
+
+    removeWorkTypes 0 (workTypes |> Seq.length)
+
+    addRooms rooms (workTypes |> Seq.length)
+
+let addTypicalRecord recordNumber teachers workTypes hours rooms =
+    openRecord recordNumber
+    addTypicalRecordWithoutOpening teachers workTypes hours rooms
+
+let processTypicalRecord recordNumber teachers workTypes hours rooms =
+    openRecord recordNumber
+
+    wipeOutTeachers ()
+    wipeOutRooms ()
+
+    addTypicalRecordWithoutOpening teachers workTypes hours rooms
