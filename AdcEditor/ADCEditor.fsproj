@@ -6,7 +6,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="AdcFunctions.fs" />
+    <Compile Include="AdcDomain.fs" />
+    <Compile Include="AdcOperational.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

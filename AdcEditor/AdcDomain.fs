@@ -1,4 +1,4 @@
-module AdcFunctions
+module AdcDomain
 
 open canopy.classic
 open canopy.types
@@ -12,10 +12,23 @@ type Tab =
     | Teachers
     | Rooms
 
-let wait path = waitForElement (xpath path)
 let (!) path = 
-    wait path
     click (xpath path)
+
+let waitForElementVisibleBySelector selector =
+    waitFor (fun () -> (element selector).Displayed)
+
+let waitForElementVisible (element: OpenQA.Selenium.IWebElement) =
+    waitFor (fun () -> element.Displayed)
+
+let tryUntilDone f =
+    let mutable isDone = false
+    while not isDone do
+        try
+            f ()
+            isDone <- true
+        with
+        | _ -> sleep 1
 
 let logIn login password =
     start chrome
@@ -27,8 +40,8 @@ let logIn login password =
 
 let switchFilter filter =
     ! "/html/body/form/div[4]/div[5]/div[3]/div[2]/div[2]/div/div[1]/table/tbody/tr/td/table[1]/tbody/tr[1]/td[9]/table/tbody/tr/td[2]/img[1]"
-    let filtersTable = element (xpath "/html/body/form/div[4]/div[5]/div[3]/div[2]/div[2]/div/div[1]/table/tbody/tr/td/div[3]/div/div/div[1]/div/table[2]/tbody/tr/td/div[2]/div/table[2]")
     sleep 1
+    let filtersTable = element (xpath "/html/body/form/div[4]/div[5]/div[3]/div[2]/div[2]/div/div[1]/table/tbody/tr/td/div[3]/div/div/div[1]/div/table[2]/tbody/tr/td/div[2]/div/table[2]")
     let filterString = 
         match filter with
         | NotStarted -> "не обработана"
@@ -55,30 +68,39 @@ let addRooms rooms workTypes =
         for i in [2..(workTypes + 1)] do
             sleep 2
             ! "/html/body/form/div[4]/div[5]/div[3]/div[2]/div[2]/div/div/div/div/div/div[3]/div/div/div/div/div[1]/table/tbody/tr/td[2]/div/div/div/div/div[1]/ul/li[1]/a/img"
+            sleep 1
             ! "/html/body/form/div[4]/div[2]/div[2]/div[2]/div/div/table[1]/tbody/tr[2]/td/div[2]/table/tbody/tr[2]/td/table/tbody/tr/td/div/div/table[1]/tbody/tr/td[2]/table/tbody/tr/td[3]/img"
             sleep 1
             ! $"/html/body/form/div[4]/div[2]/div[2]/div[2]/div/div/table[1]/tbody/tr[2]/td/div[2]/table/tbody/tr[2]/td/table/tbody/tr/td/div/div/table[1]/tbody/tr/td[2]/div/div/div/div/table/tbody/tr/td/div/div/table[2]/tr[{i}]/td"
             sleep 1
             ! "/html/body/form/div[4]/div[2]/div[2]/div[2]/div/div/table[1]/tbody/tr[2]/td/div[3]/table/tbody/tr[2]/td/table/tbody/tr/td/table/tbody/tr/td[2]/table/tbody/tr/td[1]/input"
             (xpath "/html/body/form/div[4]/div[2]/div[2]/div[2]/div/div/table[1]/tbody/tr[2]/td/div[3]/table/tbody/tr[2]/td/table/tbody/tr/td/table/tbody/tr/td[2]/table/tbody/tr/td[1]/input") << room
-            sleep 5
+            sleep 3
             press enter
 
-let addTeacher teacher workTypes hours =
-    let workTypes = List.zip workTypes hours
-
+let addTeacher teacher workTypes =
     for workType in workTypes do
         click "#viewSite li[title^='Добавить'] img"
-        // Выпадающий список "Вид работ в модуле"
-        ! "/html/body/form/div[4]/div[2]/div[2]/div[2]/div/div/table[1]/tbody/tr[2]/td/div[2]/table/tbody/tr[2]/td/table/tbody/tr/td/div/div/table[1]/tbody/tr/td[2]/table/tbody/tr/td[2]/input"
         sleep 1
-        // Получившаяся по клику на выпадающий список таблица
-        let workTypeDropDown = element (xpath "/html/body/form/div[4]/div[2]/div[2]/div[2]/div/div/table[1]/tbody/tr[2]/td/div[2]/table/tbody/tr[2]/td/table/tbody/tr/td/div/div/table[1]/tbody/tr/td[2]/div/div/div/div/table/tbody/tr/td/div/div/table[2]")
-        workTypeDropDown |> elementWithin (text (fst workType)) |> click
+        let mutable retries = 0
+        while retries < 3 do
+            try
+                // Выпадающий список "Вид работ в модуле"
+                click "input[onchange*='StudyModuleWorkKind_Edit_dropdown']"
+                sleep 1
+                // Получившаяся по клику на выпадающий список таблица
+                let workTypeDropDown = element (xpath "/html/body/form/div[4]/div[2]/div[2]/div[2]/div/div/table[1]/tbody/tr[2]/td/div[2]/table/tbody/tr[2]/td/table/tbody/tr/td/div/div/table[1]/tbody/tr/td[2]/div/div/div/div/table/tbody/tr/td/div/div/table[2]")
+                waitForElementVisible workTypeDropDown
+                workTypeDropDown |> elementWithin (text (fst workType)) |> click
+                retries <- 3
+            with 
+            | _ -> 
+                retries <- retries + 1
         click "#viewSite input[spellcheck=\"false\"]"
         (element "#viewSite input[spellcheck=\"false\"]") << teacher
-        sleep 3
+
         let surname = (teacher.Split [|' '|]).[0]
+        waitForElementVisibleBySelector (xpath $"//*[text() = '{surname}']")
         click (xpath $"//*[text() = '{surname}']")
         click "#viewSite .WebEditorCell[title^='\"Образование\"'] > table > tbody > tr> td > span"
         (xpath "/html/body/form/div[4]/div[2]/div[2]/div[2]/div/div/table[1]/tbody/tr[2]/td/table[2]/tbody/tr/td/div[1]/div/table/tbody/tr[2]/td/table/tbody/tr/td/table/tbody/tr/td[1]/input") << string (snd workType)
@@ -86,15 +108,20 @@ let addTeacher teacher workTypes hours =
 
 let wipeOutTeachers () =
     switchTab Teachers
-    let length () = elements "img[title='Отменить нагрузку']" |> Seq.length
+
+    let length () = 
+        sleep 1
+        elements "img[title='Отменить нагрузку']" |> Seq.length
+
     let mutable lastLength = length ()
     let mutable isDone = false
     let mutable offset = 0
     while not isDone do
         while ((length ()) = lastLength && offset < lastLength) do
-            let eraser = elements "img[title='Отменить нагрузку']" |> Seq.skip offset |> Seq.head
-            click eraser
-            sleep 2
+            tryUntilDone (fun () -> 
+                let eraser = elements "img[title='Отменить нагрузку']" |> Seq.skip offset |> Seq.head
+                click eraser
+            )
             if length () = lastLength then 
                 offset <- offset + 1
         lastLength <- length ()
@@ -118,35 +145,35 @@ let removeWorkTypes offset count =
         click eraser
         sleep 2
 
-let addTeachers teachers workTypes hours =
-    switchTab Teachers
-    for teacher in teachers do
-        addTeacher teacher workTypes hours
-
-let addTypicalRecordWithoutOpening teachers workTypes hours rooms =
-    addTeachers 
-        teachers
-        workTypes
-        hours
-
+let refresh () =
     sleep 1
-
     click "img[src*='Action_Refresh']"
-
     sleep 2
 
-    removeWorkTypes 0 (workTypes |> Seq.length)
+let isChecked checkboxName =
+    (element $"span input[name*='{checkboxName}']").GetAttribute("value") = "C"
 
-    addRooms rooms (workTypes |> Seq.length)
+let check checkboxName =
+    click $"table[id*='{checkboxName}'] > tbody > tr > td > span"
 
-let addTypicalRecord recordNumber teachers workTypes hours rooms =
-    openRecord recordNumber
-    addTypicalRecordWithoutOpening teachers workTypes hours rooms
+let correctTeachersData (workTypes: Map<string, int>) =
+    switchTab Teachers
+    let mutable offset = 0
+    let length = elements "img[title='Отменить нагрузку']" |> Seq.length
+    while (offset < length) do
+        tryUntilDone (fun () -> 
+            let edit = elements "img[title='Правка']" |> Seq.skip offset |> Seq.head
+            click edit
+        )
+        
+        let workKind = (element "input[onchange*='StudyModuleWorkKind_Edit_dropdown']").GetAttribute("value")
+        tryUntilDone (fun () -> "input[onfocus*='HoursPlan_Edit']" << string workTypes.[workKind])
 
-let processTypicalRecord recordNumber teachers workTypes hours rooms =
-    openRecord recordNumber
+        if not (isChecked "IsEducationLevelMatch_Edit") then
+            check "IsEducationLevelMatch_Edit"
 
-    wipeOutTeachers ()
-    wipeOutRooms ()
+        if isChecked "HasWorkplaceInquiry_Edit" && not (isChecked "PracticalExperience_Edit") then
+            check "HasPracticalExperience_Edit"
 
-    addTypicalRecordWithoutOpening teachers workTypes hours rooms
+        press enter
+        offset <- offset + 1
