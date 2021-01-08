@@ -6,6 +6,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Include="20_5162_1.docx">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </None>
+    <Compile Include="LessPainfulGoogleSheets.fs" />
+    <Compile Include="WorkDistributionData.fs" />
+    <Compile Include="CurriculumUtils.fs" />
+    <Compile Include="HardcodedData.fs" />
     <Compile Include="AdcDomain.fs" />
     <Compile Include="AdcOperational.fs" />
     <Compile Include="Program.fs" />
@@ -13,7 +20,12 @@
 
   <ItemGroup>
     <PackageReference Include="canopy" Version="2.1.5" />
+    <PackageReference Include="Google.Apis.Sheets.v4" Version="1.49.0.2175" />
     <PackageReference Include="Selenium.WebDriver.ChromeDriver" Version="87.0.4280.8800" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="DecreeGenerator\DecreeGenerator\CurriculumParser\CurriculumParser.csproj" />
   </ItemGroup>
 
 </Project>

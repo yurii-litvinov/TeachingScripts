@@ -2,59 +2,20 @@ module Main
 
 open AdcDomain
 open AdcOperational
+open CurriculumUtils
+open WorkDistributionData
 
-let login = ""
-let password = ""
+[<EntryPoint>]
+let main _ =
 
-let englishT4Rooms = [2505]
-let englishT4WorkTypes = ["Под руководством преподавателя", 76; "Практические занятия", 30; "Промежуточная аттестация (зач)", 2]
-let englishT4Teachers = ["Гукалина Александра Владимировна"; "Аношина Елена Владимировна"] 
+    doEverythingRight 
+        "20_5162_1.docx" 
+        "../../adcCredentials.txt"
 
-let englishT3Rooms = [3503; 2509; 3507; 3512; 2503; 2510]
-let englishT3WorkTypes = ["Под руководством преподавателя", 48; "Практические занятия", 58; "Промежуточная аттестация (зач)", 2]
-let englishT3Teachers = ["Парфенов Андрей Сергеевич"; "Шашукова Анна Сергеевна"; "Кононов Борис Викторович"]
+    //doMagic
+    //    "20_5162_1.docx" 
+    //    "../../adcCredentials.txt"
+    //    InProgress
 
-let englishT2Rooms = [2507; 2509]
-let englishT2WorkTypes = ["Под руководством преподавателя", 48; "Практические занятия", 58; "Промежуточная аттестация (зач)", 2]
-let englishT2Teachers = ["Журавлева Юлия Владимировна"; "Юлова Екатерина Сергеевна"]
-
-let rkiWorkTypes = ["Под руководством преподавателя"; "Практические занятия"; "В присутствии преподавателя"; "Промежуточная аттестация (зач)"]
-let onlineWorkTypes = ["Консультации", 10; "Промежуточная аттестация (зач)", 2]
-let rkiRoom = [3512]
-let computerClasses = ["2406"; "2408"; "2412"; "2414"; "2444-1"; "2444-2"; "2446"]
-
-let physicalTrainingWorkTypes = ["Практические занятия", 34; "Текущий контроль (ауд)", 2]
-let physicalTrainingTeacher = ["Поципун Анатолий Антонович"]
-let physicalTrainingRooms = ["по спортивным объектам СПбГУ"]
-
-let teamMatan = ["Виденский Илья Викторович"; "Додонов Николай Юрьевич"; "Кононова Анна Александровна"; "Семенова Ольга Львовна"]
-let teamMatanPracticeWorkTypes = ["Практические занятия", 54; "Контрольные работы", 4; "Промежуточная аттестация (зач)", 2]
-let teamMatanLectureWorkTypes = ["Лекции", 60; "Консультации", 2; "Промежуточная аттестация (экз)", 2]
-
-let algebraWorkTypes = ["Практические занятия", 26; "Лекции", 30; "Консультации", 2; "Промежуточная аттестация (экз)", 2; "Контрольные работы", 4; "Промежуточная аттестация (зач)", 2]
-
-logIn login password
-switchFilter NotStarted
-
-processTypicalRecord
-    1
-    englishT2Teachers
-    englishT2WorkTypes
-    englishT2Rooms
-
-//processLectionWithPractices
-//    1
-//    "Кононова Анна Александровна"
-//    ["Лекции", 60; "Консультации", 2; "Промежуточная аттестация (экз)", 2]
-//    ["Виденский Илья Викторович"; "Додонов Николай Юрьевич"; "Кононова Анна Александровна"; "Семенова Ольга Львовна"]
-//    ["Практические занятия", 54; "Контрольные работы", 4; "Промежуточная аттестация (зач)", 2]
-
-// openRecord 1
-
-// addRooms computerClasses 1
-
-// wipeOutTeachers ()
-
-// correctTeachersData (Map.ofList ["Лекции", 30; "Консультации", 2; "Промежуточная аттестация (экз)", 2])
-
-printfn "%s" "Done!"
+    printfn "%s" "Done!"
+    0

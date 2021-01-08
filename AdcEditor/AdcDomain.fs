@@ -3,6 +3,8 @@ module AdcDomain
 open canopy.classic
 open canopy.types
 
+open HardcodedData
+
 type Filter =
     | NotStarted
     | InProgress
@@ -28,7 +30,7 @@ let tryUntilDone f =
             f ()
             isDone <- true
         with
-        | _ -> sleep 1
+        | _ -> System.Threading.Thread.Sleep 10
 
 let logIn login password =
     start chrome
@@ -38,19 +40,34 @@ let logIn login password =
     (xpath "/html/body/div[1]/form/div[4]/div/div[3]/table/tbody/tr[2]/td/table/tbody/tr/td/div[1]/div/div/table/tbody/tr/td/div[2]/table[2]/tbody/tr[2]/td/div[2]/table/tbody/tr[2]/td/table/tbody/tr/td/table/tbody/tr/td/input") << password
     click "#Logon_PopupActions_Menu_DXI0_T"
 
+let getFilterStateFromTable row =
+    sleep 1
+    if (someElement "td[onclick*='GVScheduleCommand'] + td + td + td + td + td + td + td + td").IsNone then 
+        InProgress
+    else 
+        let filterState = (elements "td[onclick*='GVScheduleCommand'] + td + td + td + td + td + td + td + td" |> Seq.skip (row - 1) |> Seq.head).Text
+        match filterState with 
+        | "не обработана" -> NotStarted
+        | "в работе" -> InProgress
+        | "обработана" -> Done
+        | _ -> failwith (sprintf "Unknown filter state: %s" filterState)
+
 let switchFilter filter =
-    ! "/html/body/form/div[4]/div[5]/div[3]/div[2]/div[2]/div/div[1]/table/tbody/tr/td/table[1]/tbody/tr[1]/td[9]/table/tbody/tr/td[2]/img[1]"
-    sleep 1
-    let filtersTable = element (xpath "/html/body/form/div[4]/div[5]/div[3]/div[2]/div[2]/div/div[1]/table/tbody/tr/td/div[3]/div/div/div[1]/div/table[2]/tbody/tr/td/div[2]/div/table[2]")
-    let filterString = 
-        match filter with
-        | NotStarted -> "не обработана"
-        | InProgress -> "в работе"
-        | Done -> "обработана"
-    filtersTable |> elementWithin (text filterString) |> click
-    sleep 1
-    // Click on "Модуль" to close filter window if it was not closed yet
-    ! "/html/body/form/div[4]/div[5]/div[3]/div[1]/table/tbody/tr/td[3]/table/tbody/tr/td[2]/div/span/span[2]"
+    let filterState = getFilterStateFromTable 1
+    if filterState <> filter then
+        sleep 1
+        ! "/html/body/form/div[4]/div[5]/div[3]/div[2]/div[2]/div/div[1]/table/tbody/tr/td/table[1]/tbody/tr[1]/td[9]/table/tbody/tr/td[2]/img[1]"
+        sleep 1
+        let filtersTable = element (xpath "/html/body/form/div[4]/div[5]/div[3]/div[2]/div[2]/div/div[1]/table/tbody/tr/td/div[3]/div/div/div[1]/div/table[2]/tbody/tr/td/div[2]/div/table[2]")
+        let filterString = 
+            match filter with
+            | NotStarted -> "не обработана"
+            | InProgress -> "в работе"
+            | Done -> "обработана"
+        filtersTable |> elementWithin (text filterString) |> click
+        sleep 1
+        // Click on "Модуль" to close filter window if it was not closed yet
+        ! "/html/body/form/div[4]/div[5]/div[3]/div[1]/table/tbody/tr/td[3]/table/tbody/tr/td[2]/div/span/span[2]"
 
 let switchTab tab =
     match tab with
@@ -75,13 +92,19 @@ let addRooms rooms workTypes =
             sleep 1
             ! "/html/body/form/div[4]/div[2]/div[2]/div[2]/div/div/table[1]/tbody/tr[2]/td/div[3]/table/tbody/tr[2]/td/table/tbody/tr/td/table/tbody/tr/td[2]/table/tbody/tr/td[1]/input"
             (xpath "/html/body/form/div[4]/div[2]/div[2]/div[2]/div/div/table[1]/tbody/tr[2]/td/div[3]/table/tbody/tr[2]/td/table/tbody/tr/td/table/tbody/tr/td[2]/table/tbody/tr/td[1]/input") << room
-            sleep 3
+            sleep 4
             press enter
+
+let isChecked checkboxName =
+    (element $"span input[name*='{checkboxName}']").GetAttribute("value") = "C"
+
+let check checkboxName =
+    click $"table[id*='{checkboxName}'] > tbody > tr > td > span"
 
 let addTeacher teacher workTypes =
     for workType in workTypes do
         click "#viewSite li[title^='Добавить'] img"
-        sleep 1
+        sleep 2
         let mutable retries = 0
         while retries < 3 do
             try
@@ -96,14 +119,25 @@ let addTeacher teacher workTypes =
             with 
             | _ -> 
                 retries <- retries + 1
-        click "#viewSite input[spellcheck=\"false\"]"
-        (element "#viewSite input[spellcheck=\"false\"]") << teacher
+        try
+            click "#viewSite input[spellcheck=\"false\"]"
+            "#viewSite input[spellcheck=\"false\"]" << teacher
 
-        let surname = (teacher.Split [|' '|]).[0]
-        waitForElementVisibleBySelector (xpath $"//*[text() = '{surname}']")
-        click (xpath $"//*[text() = '{surname}']")
-        click "#viewSite .WebEditorCell[title^='\"Образование\"'] > table > tbody > tr> td > span"
-        (xpath "/html/body/form/div[4]/div[2]/div[2]/div[2]/div/div/table[1]/tbody/tr[2]/td/table[2]/tbody/tr/td/div[1]/div/table/tbody/tr[2]/td/table/tbody/tr/td/table/tbody/tr/td[1]/input") << string (snd workType)
+            let surname = (teacher.Split [|' '|]).[0]
+            let fathersName = (teacher.Split [|' '|]).[2]
+            waitForElementVisibleBySelector (xpath $"//*[text() = '{surname}']")
+            click (xpath $"//*[text() = '{fathersName}']")
+        
+            check "IsEducationLevelMatch_Edit"
+
+            sleep 2
+            if isChecked "HasWorkplaceInquiry_Edit" && not (isChecked "PracticalExperience_Edit") && not (irrelevantIndustrialExperience.Contains teacher) then
+                check "HasPracticalExperience_Edit"
+
+            (xpath "/html/body/form/div[4]/div[2]/div[2]/div[2]/div/div/table[1]/tbody/tr[2]/td/table[2]/tbody/tr/td/div[1]/div/table/tbody/tr[2]/td/table/tbody/tr/td/table/tbody/tr/td[1]/input") << string (snd workType)
+        with
+        | _ -> ()
+
         press enter
 
 let wipeOutTeachers () =
@@ -112,6 +146,15 @@ let wipeOutTeachers () =
     let length () = 
         sleep 1
         elements "img[title='Отменить нагрузку']" |> Seq.length
+
+    let mutable quickPassCounter = (length ()) - 3
+
+    while quickPassCounter > 0 do
+        tryUntilDone (fun () -> 
+            let eraser = elements "img[title='Отменить нагрузку']" |> Seq.skip (quickPassCounter / 2) |> Seq.head
+            click eraser
+        )
+        quickPassCounter <- quickPassCounter - 1
 
     let mutable lastLength = length ()
     let mutable isDone = false
@@ -150,12 +193,6 @@ let refresh () =
     click "img[src*='Action_Refresh']"
     sleep 2
 
-let isChecked checkboxName =
-    (element $"span input[name*='{checkboxName}']").GetAttribute("value") = "C"
-
-let check checkboxName =
-    click $"table[id*='{checkboxName}'] > tbody > tr > td > span"
-
 let correctTeachersData (workTypes: Map<string, int>) =
     switchTab Teachers
     let mutable offset = 0
@@ -177,3 +214,20 @@ let correctTeachersData (workTypes: Map<string, int>) =
 
         press enter
         offset <- offset + 1
+
+let getDisciplineNameFromTable row =
+    (elements "td[onclick*='GVScheduleCommand'] + td + td + td + td + td + td" |> Seq.skip (row - 1) |> Seq.head).Text
+
+let getSemesterFromTable row =
+    let semester = (elements "td[onclick*='GVScheduleCommand'] + td + td + td" |> Seq.skip (row - 1) |> Seq.head).Text
+    semester.Replace("Семестр ", "") |> int
+
+let getRecordCaption () =
+    (element "span .MainMenuTruncateCaption + span").GetAttribute "title"
+
+let backToTable () =
+    click "a[href*='StudyModule_ListView']"
+    sleep 2
+
+let tableSize () =
+    ((elements "table[id*='MainTable'] > tbody > tr") |> Seq.length) - 1
