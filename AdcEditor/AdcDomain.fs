@@ -92,8 +92,15 @@ let addRooms rooms workTypes =
             sleep 1
             ! "/html/body/form/div[4]/div[2]/div[2]/div[2]/div/div/table[1]/tbody/tr[2]/td/div[3]/table/tbody/tr[2]/td/table/tbody/tr/td/table/tbody/tr/td[2]/table/tbody/tr/td[1]/input"
             (xpath "/html/body/form/div[4]/div[2]/div[2]/div[2]/div/div/table[1]/tbody/tr[2]/td/div[3]/table/tbody/tr[2]/td/table/tbody/tr/td/table/tbody/tr/td[2]/table/tbody/tr/td[1]/input") << room
-            sleep 4
-            press enter
+            sleep 2
+            if room = "405" then
+                // There are two rooms with number 405. One in Smolny, second one is correct
+                click "table[id*='Room_Edit_DDD_gv_DXMainTable'] > tbody > tr + tr + tr > td"
+            else
+                click "table[id*='Room_Edit_DDD_gv_DXMainTable'] > tbody > tr + tr > td"
+            sleep 2
+            // Click "OK"
+            click "li > a[id*='Dialog_SAC_Menu_DXI0']"
 
 let isChecked checkboxName =
     (element $"span input[name*='{checkboxName}']").GetAttribute("value") = "C"
@@ -126,9 +133,14 @@ let addTeacher teacher workTypes =
             let surname = (teacher.Split [|' '|]).[0]
             let fathersName = (teacher.Split [|' '|]).[2]
             waitForElementVisibleBySelector (xpath $"//*[text() = '{surname}']")
-            click (xpath $"//*[text() = '{fathersName}']")
+            // Default Лебедева Анастасия Владимировна is librarian, we need mathematician
+            if teacher <> "Лебедева Анастасия Владимировна" then
+                click (xpath $"//*[text() = '{fathersName}']")
+            else
+                click (xpath $"(//*[text() = 'Владимировна'])[2]")
         
-            check "IsEducationLevelMatch_Edit"
+            if not (irrelevantEducation.Contains teacher) then
+                check "IsEducationLevelMatch_Edit"
 
             sleep 2
             if isChecked "HasWorkplaceInquiry_Edit" && not (isChecked "PracticalExperience_Edit") && not (irrelevantIndustrialExperience.Contains teacher) then
@@ -227,7 +239,7 @@ let getRecordCaption () =
 
 let backToTable () =
     click "a[href*='StudyModule_ListView']"
-    sleep 2
+    sleep 3
 
 let tableSize () =
     ((elements "table[id*='MainTable'] > tbody > tr") |> Seq.length) - 1

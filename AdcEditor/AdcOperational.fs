@@ -35,15 +35,16 @@ let processTypicalRecord recordNumber teachers workTypes rooms =
 
     addTypicalRecordWithoutOpening teachers workTypes rooms
 
-let processLectionWithPracticesNoOpen lecturer lecturerWorkTypes practitioners practicionerWorkTypes =
+let processLectionWithPracticesNoOpen lecturer lecturerWorkTypes practitioners practicionerWorkTypes rooms =
     addTeachers [lecturer] lecturerWorkTypes
     addTeachers practitioners practicionerWorkTypes
     refresh ()
     removeWorkTypes 0 (lecturerWorkTypes @ practicionerWorkTypes |> Seq.length)
+    addRooms rooms (lecturerWorkTypes @ practicionerWorkTypes |> Seq.length)
 
-let processLectionWithPractices recordNumber lecturer lecturerWorkTypes practitioners practicionerWorkTypes =
+let processLectionWithPractices recordNumber lecturer lecturerWorkTypes practitioners practicionerWorkTypes rooms =
     openRecord recordNumber
-    processLectionWithPracticesNoOpen lecturer lecturerWorkTypes practitioners practicionerWorkTypes
+    processLectionWithPracticesNoOpen lecturer lecturerWorkTypes practitioners practicionerWorkTypes rooms
 
 let doEnglishMagic row semester =
     openRecord row
@@ -120,11 +121,13 @@ let doMagicForFirstDiscipline (curriculum: Curriculum) (workload: WorkDistributi
     match disciplineName with 
     | "Английский язык" ->
         doEnglishMagic disciplineRow semester
-    | "Учебная практика 1 (научно-исследовательская работа)" ->
+    | "Учебная практика 1 (научно-исследовательская работа)" 
+    | "Учебная практика 2 (научно-исследовательская работа)" 
+    | "Производственная практика (проектно-технологическая)" ->
         processTypicalRecordNoWipe 
             1 
             ["Литвинов Юрий Викторович"; "Литвинов Юрий Викторович"; "Литвинов Юрий Викторович"; "Литвинов Юрий Викторович"]
-            (if semester = 4 then practiceS4WorkTypes else failwith "Unknown semester")
+            practiceWorkTypes
             computerClasses
     | "Физическая культура и спорт" ->
         // Physical training also has trajectories and they actually have different teachers. But we don't have enough
@@ -149,12 +152,14 @@ let doMagicForFirstDiscipline (curriculum: Curriculum) (workload: WorkDistributi
             if teachers.practicioners = [] then
                 failwith "No data!"
 
+            let rooms = if knownRooms.ContainsKey disciplineName then knownRooms.[disciplineName] else []
+
             if teachers.lecturer = "" then
                 processTypicalRecordNoWipe
                     disciplineRow
                     teachers.practicioners
                     (curriculum.GetWorkTypes disciplineName semester)
-                    []
+                    rooms
             else
                 processLectionWithPractices
                     disciplineRow
@@ -162,20 +167,22 @@ let doMagicForFirstDiscipline (curriculum: Curriculum) (workload: WorkDistributi
                     (curriculum.GetLectionWorkTypes disciplineName semester)
                     teachers.practicioners
                     (curriculum.GetPracticeWorkTypes disciplineName semester)
+                    rooms
 
     refresh ()
 
-
-let doMagic curriculimFileName pathToAdcCredentials filter =
-    let curriculum = Curriculum(curriculimFileName)
-    
-
+let logIn pathToAdcCredentials =
     let login, password = 
         System.IO.File.ReadLines(pathToAdcCredentials) 
         |> Seq.toList 
         |> fun list -> (List.head list, list |> List.item 1)
 
     logIn login password
+
+let doMagic curriculimFileName pathToAdcCredentials filter =
+    let curriculum = Curriculum(curriculimFileName)
+
+    logIn pathToAdcCredentials
     switchFilter filter
 
     let semester = getSemesterFromTable 1
@@ -186,12 +193,7 @@ let doMagic curriculimFileName pathToAdcCredentials filter =
 let doEverythingRight curriculimFileName pathToAdcCredentials =
     let curriculum = Curriculum(curriculimFileName)
 
-    let login, password = 
-        System.IO.File.ReadLines(pathToAdcCredentials) 
-        |> Seq.toList 
-        |> fun list -> (List.head list, list |> List.item 1)
-
-    logIn login password
+    logIn pathToAdcCredentials
     switchFilter NotStarted
 
     let semester = getSemesterFromTable 1
@@ -201,3 +203,11 @@ let doEverythingRight curriculimFileName pathToAdcCredentials =
         doMagicForFirstDiscipline curriculum workload
 
         backToTable ()
+
+let autoAddRooms pathToAdcCredentials rooms workTypes =
+    logIn pathToAdcCredentials
+
+    switchFilter InProgress
+    openRecord 1
+    
+    addRooms rooms workTypes

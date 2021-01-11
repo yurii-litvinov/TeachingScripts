@@ -15,6 +15,10 @@ type WorkDistribution(semester) =
         match semester with
         | 1 | 2 -> "ТП, 1-2 семестры"
         | 3 | 4 -> "Матобес, 3-4 семестры"
+        | 5 -> "Матобес, 5 семестр"
+        | 6 -> "Матобес, 6 семестр"
+        | 7 -> "Матобес, 7 семестр"
+        | 8 -> "Матобес, 8 семестр"
         | _ -> failwith "Unknown semester"
     let rawData = readGoogleSheet service "1aLSgrsDnWAiGD7nMbAts6SxHA9PybMaNlWOPiNgsk7w" page "A" "C" 2
     

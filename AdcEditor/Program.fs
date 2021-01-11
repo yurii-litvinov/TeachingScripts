@@ -4,9 +4,12 @@ open AdcDomain
 open AdcOperational
 open CurriculumUtils
 open WorkDistributionData
+open HardcodedData
 
 [<EntryPoint>]
 let main _ =
+
+    // logIn "../../adcCredentials.txt"
 
     doEverythingRight 
         "20_5162_1.docx" 
@@ -16,6 +19,14 @@ let main _ =
     //    "20_5162_1.docx" 
     //    "../../adcCredentials.txt"
     //    InProgress
+
+    //autoAddRooms "../../adcCredentials.txt" ["2444-1"; "2444-2"; "2412"] 3
+
+    //addTypicalRecord
+    //    1
+    //    ["Демьянович Юрий Казимирович"]
+    //    ["Лабораторные работы", 16; "Консультации", 2; "Промежуточная аттестация (экз)", 2; "Лекции", 48]
+    //    ["405"; "2448"]
 
     printfn "%s" "Done!"
     0
