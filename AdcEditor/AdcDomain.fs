@@ -12,6 +12,7 @@ type Filter =
 
 type Tab =
     | Teachers
+    | Software
     | Rooms
 
 let (!) path = 
@@ -72,6 +73,7 @@ let switchFilter filter =
 let switchTab tab =
     match tab with
     | Teachers -> click (text "Преподаватели")
+    | Software -> click (text "Программное обеспечение по видам работ")
     | Rooms -> click (text "Помещения для вида работы")
 
 let openRecord num =
@@ -98,6 +100,25 @@ let addRooms rooms workTypes =
                 click "table[id*='Room_Edit_DDD_gv_DXMainTable'] > tbody > tr + tr + tr > td"
             else
                 click "table[id*='Room_Edit_DDD_gv_DXMainTable'] > tbody > tr + tr > td"
+            sleep 2
+            // Click "OK"
+            click "li > a[id*='Dialog_SAC_Menu_DXI0']"
+
+let addSoftware software workTypes =
+    switchTab Software
+    for soft in software do
+        for i in [2..(workTypes + 1)] do
+            sleep 2
+            click "img[id*='WorkKindSoftwareProducts_ToolBar_Menu_DXI0_Img']"
+            sleep 1
+            click "img[id*='StudyModuleWorkKind_Edit_dropdown_DD_B-1Img']"
+            sleep 1
+            ! $"/html/body/form/div[4]/div[2]/div[2]/div[2]/div/div/table[1]/tbody/tr[2]/td/div[2]/table/tbody/tr[2]/td/table/tbody/tr/td/div/div/table[1]/tbody/tr/td[2]/div/div/div/div/table/tbody/tr/td/div/div/table[2]/tr[{i}]/td"
+            sleep 1
+            click "input[id*='SoftwareProduct_Edit_I']"
+            "input[id*='SoftwareProduct_Edit_I']" << soft
+            sleep 2
+            click (xpath $"//*[text() = '{soft}']")
             sleep 2
             // Click "OK"
             click "li > a[id*='Dialog_SAC_Menu_DXI0']"
@@ -133,11 +154,12 @@ let addTeacher teacher workTypes =
             let surname = (teacher.Split [|' '|]).[0]
             let fathersName = (teacher.Split [|' '|]).[2]
             waitForElementVisibleBySelector (xpath $"//*[text() = '{surname}']")
-            // Default Лебедева Анастасия Владимировна is librarian, we need mathematician
-            if teacher <> "Лебедева Анастасия Владимировна" then
+            // Default Лебедева Анастасия Владимировна is librarian, we need mathematician. 
+            // Same with Смирнов Михаил Николаевич, we need second.
+            if teacher <> "Лебедева Анастасия Владимировна" && teacher <> "Смирнов Михаил Николаевич" then
                 click (xpath $"//*[text() = '{fathersName}']")
             else
-                click (xpath $"(//*[text() = 'Владимировна'])[2]")
+                click (xpath $"(//*[text() = '{fathersName}'])[2]")
         
             if not (irrelevantEducation.Contains teacher) then
                 check "IsEducationLevelMatch_Edit"

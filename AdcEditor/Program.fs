@@ -9,18 +9,20 @@ open HardcodedData
 [<EntryPoint>]
 let main _ =
 
-    // logIn "../../adcCredentials.txt"
+    //logIn "../../adcCredentials.txt"
 
-    doEverythingRight 
-        "20_5162_1.docx" 
-        "../../adcCredentials.txt"
+    //doEverythingRight 
+    //    "20_5162_1.docx" 
+    //    "../../adcCredentials.txt"
 
     //doMagic
     //    "20_5162_1.docx" 
     //    "../../adcCredentials.txt"
     //    InProgress
 
-    //autoAddRooms "../../adcCredentials.txt" ["2444-1"; "2444-2"; "2412"] 3
+    autoAddRooms ["2414"]
+    
+    //autoAddSoftware["ANTLR"; "Bison"]
 
     //addTypicalRecord
     //    1

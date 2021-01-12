@@ -123,7 +123,8 @@ let doMagicForFirstDiscipline (curriculum: Curriculum) (workload: WorkDistributi
         doEnglishMagic disciplineRow semester
     | "Учебная практика 1 (научно-исследовательская работа)" 
     | "Учебная практика 2 (научно-исследовательская работа)" 
-    | "Производственная практика (проектно-технологическая)" ->
+    | "Производственная практика (проектно-технологическая)"
+    | "Производственная практика (научно-исследовательская работа)" ->
         processTypicalRecordNoWipe 
             1 
             ["Литвинов Юрий Викторович"; "Литвинов Юрий Викторович"; "Литвинов Юрий Викторович"; "Литвинов Юрий Викторович"]
@@ -168,6 +169,9 @@ let doMagicForFirstDiscipline (curriculum: Curriculum) (workload: WorkDistributi
                     teachers.practicioners
                     (curriculum.GetPracticeWorkTypes disciplineName semester)
                     rooms
+   
+    if knownSoftware.ContainsKey disciplineName then
+        addSoftware knownSoftware.[disciplineName] (curriculum.GetWorkTypes disciplineName semester |> Seq.length)
 
     refresh ()
 
@@ -204,10 +208,29 @@ let doEverythingRight curriculimFileName pathToAdcCredentials =
 
         backToTable ()
 
-let autoAddRooms pathToAdcCredentials rooms workTypes =
-    logIn pathToAdcCredentials
+let autoAddRooms rooms =
+    logIn "../../adcCredentials.txt"
+    let curriculum = Curriculum("20_5162_1.docx")
 
     switchFilter InProgress
+
+    let disciplineName = getDisciplineNameFromTable 1
+    let semester = getSemesterFromTable 1
+
     openRecord 1
     
-    addRooms rooms workTypes
+    addRooms rooms (curriculum.GetWorkTypes disciplineName semester |> Seq.length)
+
+let autoAddSoftware software =
+    logIn "../../adcCredentials.txt"
+
+    let curriculum = Curriculum("20_5162_1.docx")
+
+    switchFilter InProgress
+
+    let disciplineName = getDisciplineNameFromTable 1
+    let semester = getSemesterFromTable 1
+
+    openRecord 1
+    
+    addSoftware software (curriculum.GetWorkTypes disciplineName semester |> Seq.length)
