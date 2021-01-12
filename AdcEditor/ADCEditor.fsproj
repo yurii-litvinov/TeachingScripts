@@ -9,6 +9,7 @@
     <None Include="20_5162_1.docx">
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </None>
+    <Compile Include="VkrAdvisorsParser.fs" />
     <Compile Include="LessPainfulGoogleSheets.fs" />
     <Compile Include="WorkDistributionData.fs" />
     <Compile Include="CurriculumUtils.fs" />
@@ -20,6 +21,7 @@
 
   <ItemGroup>
     <PackageReference Include="canopy" Version="2.1.5" />
+    <PackageReference Include="DocumentFormat.OpenXml" Version="2.12.1" />
     <PackageReference Include="Google.Apis.Sheets.v4" Version="1.49.0.2175" />
     <PackageReference Include="Selenium.WebDriver.ChromeDriver" Version="87.0.4280.8800" />
   </ItemGroup>
