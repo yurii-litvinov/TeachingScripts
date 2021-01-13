@@ -6,15 +6,18 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Include="20_5162_1.docx">
-      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-    </None>
-    <Compile Include="VkrAdvisorsParser.fs" />
+    <None Include="20_5162_1.docx" />
     <Compile Include="LessPainfulGoogleSheets.fs" />
-    <Compile Include="WorkDistributionData.fs" />
-    <Compile Include="CurriculumUtils.fs" />
+    <Compile Include="LessPainfulXlsx.fs" />
     <Compile Include="HardcodedData.fs" />
+    <Compile Include="WorkDistributionTypes.fs" />
+    <Compile Include="OfficialWorkDistributionParser.fs" />
+    <Compile Include="WorkDistributionData.fs" />
+    <Compile Include="EnglishTeachers.fs" />
+    <Compile Include="VkrAdvisorsParser.fs" />
+    <Compile Include="CurriculumUtils.fs" />
     <Compile Include="AdcDomain.fs" />
+    <Compile Include="Config.fs" />
     <Compile Include="AdcOperational.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>

@@ -2,12 +2,7 @@
 
 open LessPainfulGoogleSheets
 open System.Text.RegularExpressions
-
-type WorkloadInfo =
-    {
-        lecturer: string
-        practicioners: string list
-    }
+open WorkDistributionTypes
 
 type WorkDistribution(semester) =
     let service = openGoogleSheet "AssignmentMatcher"
@@ -35,10 +30,10 @@ type WorkDistribution(semester) =
         if strings.[0].StartsWith("Лекции") then
             let lecturer = strings.[0].Replace("Лекции: ", "").Trim()
             let practicioners = strings |> List.ofArray |> List.skip 2 |> List.map (fun s -> s.Trim())
-            { lecturer = lecturer; practicioners = practicioners }
+            { lecturers = [lecturer]; practicioners = practicioners }
         else
             let practicioners = strings |> List.ofArray |> List.map (fun s -> s.Trim())
-            { lecturer = ""; practicioners = practicioners }
+            { lecturers = []; practicioners = practicioners }
 
     let parsedData = 
         rawData 
@@ -46,8 +41,10 @@ type WorkDistribution(semester) =
         |> Seq.map (fun (name, teachers) -> (parseDisciplineName name, parseWorkloadInfo teachers))
         |> Map.ofSeq
 
-    member _.Teachers discipline =
-        if parsedData.ContainsKey discipline then 
-            parsedData.[discipline]
-        else
-            { lecturer = ""; practicioners = [] }
+    interface IWorkDistribution with
+
+        member _.Teachers _ discipline =
+            if parsedData.ContainsKey discipline then 
+                parsedData.[discipline]
+            else
+                { lecturers = []; practicioners = [] }

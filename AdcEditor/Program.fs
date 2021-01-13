@@ -6,35 +6,33 @@ open CurriculumUtils
 open WorkDistributionData
 open HardcodedData
 open VkrAdvisorsParser
+open OfficialWorkDistributionParser
+open WorkDistributionTypes
+open EnglishTeachers
+open Config
 
 [<EntryPoint>]
 let main _ =
 
-    //logIn "../../adcCredentials.txt"
+    //logIn ()
 
-    //doEverythingRight 
-    //    "20_5162_1.docx" 
-    //    "../../adcCredentials.txt"
-
-    //doMagic
-    //    "20_5162_1.docx" 
-    //    "../../adcCredentials.txt"
-    //    InProgress
-
-    autoAddRooms ["2414"]
+    //let teachers = EnglishTeachers(Config.workPlan)
     
-    //autoAddSoftware["ANTLR"; "Bison"]
+    //printfn "%A" (teachers.Teachers 1 "Траектория 3")
+
+    doEverythingRight ()
+
+    //doMagic InProgress
+
+    //autoAddRooms ["405"; "2414"; "2448"]
+    
+    //autoAddSoftware ["Office "; "Denwer"; "Notepad++"; "TeXstudio"]
 
     //addTypicalRecord
     //    1
-    //    ["Демьянович Юрий Казимирович"]
-    //    ["Лабораторные работы", 16; "Консультации", 2; "Промежуточная аттестация (экз)", 2; "Лекции", 48]
-    //    ["405"; "2448"]
-
-    let students = parseVkrAdvisors "../../Приложение к приказу ВКР и НР5006 23.11.2020 20.05.01.docx"
-
-    students 
-    |> Seq.iter (fun s -> printfn "%s" s.advisor)
+    //    ["Смирнов Михаил Николаевич"]
+    //    ["Промежуточная аттестация (зач)", 2; "Лекции", 24]
+    //    []
 
     printfn "%s" "Done!"
     0

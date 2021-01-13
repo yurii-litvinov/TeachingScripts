@@ -129,7 +129,7 @@ let isChecked checkboxName =
 let check checkboxName =
     click $"table[id*='{checkboxName}'] > tbody > tr > td > span"
 
-let addTeacher teacher workTypes =
+let addTeacher teacher workTypes isRelevantExperience =
     for workType in workTypes do
         click "#viewSite li[title^='Добавить'] img"
         sleep 2
@@ -165,7 +165,7 @@ let addTeacher teacher workTypes =
                 check "IsEducationLevelMatch_Edit"
 
             sleep 2
-            if isChecked "HasWorkplaceInquiry_Edit" && not (isChecked "PracticalExperience_Edit") && not (irrelevantIndustrialExperience.Contains teacher) then
+            if isChecked "HasWorkplaceInquiry_Edit" && not (isChecked "PracticalExperience_Edit") && isRelevantExperience then
                 check "HasPracticalExperience_Edit"
 
             (xpath "/html/body/form/div[4]/div[2]/div[2]/div[2]/div/div/table[1]/tbody/tr[2]/td/table[2]/tbody/tr/td/div[1]/div/table/tbody/tr[2]/td/table/tbody/tr/td/table/tbody/tr/td[1]/input") << string (snd workType)
@@ -206,7 +206,7 @@ let wipeOutTeachers () =
 
 let wipeOutRooms () =
     switchTab Rooms
-    sleep 1
+    sleep 2
     if (elements "span[title='Состояние выбранных строк на всех страницах']" |> Seq.length) > 1 then
         sleep 1
         elements "span[title='Состояние выбранных строк на всех страницах']" |> Seq.skip 1 |> Seq.head |> click
