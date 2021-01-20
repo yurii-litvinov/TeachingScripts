@@ -48,3 +48,6 @@ type WorkDistribution(semester) =
                 parsedData.[discipline]
             else
                 { lecturers = []; practicioners = [] }
+
+        member _.HaveData _ discipline = 
+            parsedData.ContainsKey discipline

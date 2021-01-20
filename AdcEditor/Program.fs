@@ -10,19 +10,31 @@ open OfficialWorkDistributionParser
 open WorkDistributionTypes
 open EnglishTeachers
 open Config
+open RoomData
+open CurriculumParser
 
 [<EntryPoint>]
 let main _ =
 
     //logIn ()
 
-    //let teachers = EnglishTeachers(Config.workPlan)
-    
-    //printfn "%A" (teachers.Teachers 1 "Траектория 3")
+    //checkRpds "../../5006"
+    createSoftwareReport "../../5006"
 
-    doEverythingRight ()
+    //doEverythingRight ()
 
     //doMagic InProgress
+
+    //checkWorkDistribution 8
+
+    //let teachers = EnglishTeachers(Config.workPlan)
+    //printfn "%A" (teachers.Teachers 1 "Траектория 3")
+
+    //let roomData = RoomData(Config.roomDataSheetId)
+    //printfn "%A" (roomData.Rooms 2 "Программирование")
+
+    //autoCorrectRoomsForAll Done 7
+    //autoCorrectRoomsForFirst ()
 
     //autoAddRooms ["405"; "2414"; "2448"]
     
@@ -33,6 +45,11 @@ let main _ =
     //    ["Смирнов Михаил Николаевич"]
     //    ["Промежуточная аттестация (зач)", 2; "Лекции", 24]
     //    []
+
+    //checkWorkDistribution 7
+
+    //let test = OfficialWorkDistributionParser() :> IWorkDistribution
+    //printfn "%A" <| test.Teachers 3 "Алгебра и теория чисел"
 
     printfn "%s" "Done!"
     0

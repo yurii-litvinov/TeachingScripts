@@ -71,38 +71,89 @@ let switchFilter filter =
         ! "/html/body/form/div[4]/div[5]/div[3]/div[1]/table/tbody/tr/td[3]/table/tbody/tr/td[2]/div/span/span[2]"
 
 let switchTab tab =
-    match tab with
-    | Teachers -> click (text "Преподаватели")
-    | Software -> click (text "Программное обеспечение по видам работ")
-    | Rooms -> click (text "Помещения для вида работы")
+    tryUntilDone (fun () -> 
+        match tab with
+        | Teachers -> click (text "Преподаватели")
+        | Software -> click (text "Программное обеспечение по видам работ")
+        | Rooms -> click (text "Помещения для вида работы")
+    )
 
 let openRecord num =
     ! $"/html/body/form/div[4]/div[5]/div[3]/div[2]/div[2]/div/div[1]/table/tbody/tr/td/table[1]/tbody/tr[{num + 1}]/td[9]"
+    sleep 1
 
-let addRooms rooms workTypes =
+let addRooms (rooms: Map<string, string list>) =
     switchTab Rooms
-    let rooms = rooms |> Seq.map string
+    
+    rooms |> Map.iter (
+        fun workType rooms ->
+            for room in rooms do
+                // Large green plus button
+                click "img[id*='StudyModuleWorkKindRooms_ToolBar_Menu_DXI0_Img']"
 
-    for room in rooms do
-        for i in [2..(workTypes + 1)] do
-            sleep 2
-            ! "/html/body/form/div[4]/div[5]/div[3]/div[2]/div[2]/div/div/div/div/div/div[3]/div/div/div/div/div[1]/table/tbody/tr/td[2]/div/div/div/div/div[1]/ul/li[1]/a/img"
-            sleep 1
-            ! "/html/body/form/div[4]/div[2]/div[2]/div[2]/div/div/table[1]/tbody/tr[2]/td/div[2]/table/tbody/tr[2]/td/table/tbody/tr/td/div/div/table[1]/tbody/tr/td[2]/table/tbody/tr/td[3]/img"
-            sleep 1
-            ! $"/html/body/form/div[4]/div[2]/div[2]/div[2]/div/div/table[1]/tbody/tr[2]/td/div[2]/table/tbody/tr[2]/td/table/tbody/tr/td/div/div/table[1]/tbody/tr/td[2]/div/div/div/div/table/tbody/tr/td/div/div/table[2]/tr[{i}]/td"
-            sleep 1
-            ! "/html/body/form/div[4]/div[2]/div[2]/div[2]/div/div/table[1]/tbody/tr[2]/td/div[3]/table/tbody/tr[2]/td/table/tbody/tr/td/table/tbody/tr/td[2]/table/tbody/tr/td[1]/input"
-            (xpath "/html/body/form/div[4]/div[2]/div[2]/div[2]/div/div/table[1]/tbody/tr[2]/td/div[3]/table/tbody/tr[2]/td/table/tbody/tr/td/table/tbody/tr/td[2]/table/tbody/tr/td[1]/input") << room
-            sleep 2
-            if room = "405" then
-                // There are two rooms with number 405. One in Smolny, second one is correct
-                click "table[id*='Room_Edit_DDD_gv_DXMainTable'] > tbody > tr + tr + tr > td"
-            else
-                click "table[id*='Room_Edit_DDD_gv_DXMainTable'] > tbody > tr + tr > td"
-            sleep 2
-            // Click "OK"
-            click "li > a[id*='Dialog_SAC_Menu_DXI0']"
+                // Sometimes room selection doesn't work, will try several times
+                while (element "input[id*='StudyModuleWorkKind_Edit_dropdown_DD_I']").GetAttribute("value") = "Н/Д" do
+                    // Sometimes click on dropdown does not work for some reason, try several times
+                    let mutable isDone = false
+                    while not isDone do
+                        // Work type selection dropdown
+                        click "img[id*='StudyModuleWorkKind_Edit_dropdown_DD_B-1']"
+                        sleep 1
+                        isDone <- (someElement (xpath $"//tr[contains(@class, 'List')]/td[text() = '{workType}']")).IsSome
+                    
+                    // Work type
+                    click (xpath $"//tr[contains(@class, 'List')]/td[text() = '{workType}']")
+                    // Giving some time
+                    sleep 1
+                // Room
+                click "input[id*='dviRoom_Edit_I']"
+                // Giving some time
+                sleep 1
+                "input[id*='dviRoom_Edit_I']" << room
+                // Wait for it to load room data
+                sleep 2
+
+                // Large auditories are ambiguous as hell so we need some involved special processing
+                if room.Length = 1 then
+                    // Click on address filter
+                    click "td[id*='Room_Edit_DDD_gv_col0'] img[class*='Filter']"
+                    // Let it load filter data
+                    sleep 1
+                    // Click on input field
+                    click "input[id*='HFListBox0_LBFE']"
+                    // Enter part of an address
+                    "input[id*='HFListBox0_LBFE']" << "28"
+                    // Let filter do its work
+                    sleep 1
+                    // Select address.
+                    click "table[id*='Room_Edit_DDD_gv_HFListBox0_LBT'] > tr > td"
+                    // Waiting for a filter to do its thing
+                    sleep 1
+                    // Now sifting through pages of filter output
+                    while (someElement (xpath $"//tr[contains(@id,'Room_Edit_DDD_gv_DXDataRow')]/td[text() = '{room}']")).IsNone 
+                        && (someElement "a[id*='Room_Edit_DDD_gv_DXPagerBottom'] > img[alt='Следующая']").IsSome do
+                        // Click next page
+                        click "a[id*='Room_Edit_DDD_gv_DXPagerBottom'] > img[alt='Следующая']"
+                        // Let selection window load next page
+                        sleep 1
+                    // Hopefully we found what we were looking for. If not, script will stall here and user will be 
+                    // aware that something is wrong.
+                    click (xpath $"//tr[contains(@id,'Room_Edit_DDD_gv_DXDataRow')]/td[text() = '{room}']")
+                
+                elif room = "405" then
+                    // There are many rooms with number 405, second one is correct (for now)
+                    click "table[id*='Room_Edit_DDD_gv_DXMainTable'] > tbody > tr + tr + tr > td"
+                elif room = "актовый зал правая" then
+                    click "table[id*='Room_Edit_DDD_gv_DXMainTable'] > tbody > tr + tr + tr + tr + tr + tr > td"
+
+                else
+                    click "table[id*='Room_Edit_DDD_gv_DXMainTable'] > tbody > tr + tr > td"
+
+                // Wait for ADC to load room data
+                sleep 2
+                // Click "OK"
+                click "li > a[id*='Dialog_SAC_Menu_DXI0']"
+    )
 
 let addSoftware software workTypes =
     switchTab Software
@@ -127,11 +178,19 @@ let isChecked checkboxName =
     (element $"span input[name*='{checkboxName}']").GetAttribute("value") = "C"
 
 let check checkboxName =
-    click $"table[id*='{checkboxName}'] > tbody > tr > td > span"
+    while not (isChecked checkboxName) do
+        click $"table[id*='{checkboxName}'] > tbody > tr > td > span"
+        System.Threading.Thread.Sleep 50
 
 let addTeacher teacher workTypes isRelevantExperience =
     for workType in workTypes do
-        click "#viewSite li[title^='Добавить'] img"
+        try
+            click "#viewSite li[title^='Добавить'] img"
+        with
+        | _ ->
+            click "li > a[id*='Dialog_SAC_Menu_DXI0']"
+            sleep 2
+            click "#viewSite li[title^='Добавить'] img"
         sleep 2
         let mutable retries = 0
         while retries < 3 do
@@ -160,6 +219,8 @@ let addTeacher teacher workTypes isRelevantExperience =
                 click (xpath $"//*[text() = '{fathersName}']")
             else
                 click (xpath $"(//*[text() = '{fathersName}'])[2]")
+
+            sleep 2
         
             if not (irrelevantEducation.Contains teacher) then
                 check "IsEducationLevelMatch_Edit"
@@ -168,63 +229,48 @@ let addTeacher teacher workTypes isRelevantExperience =
             if isChecked "HasWorkplaceInquiry_Edit" && not (isChecked "PracticalExperience_Edit") && isRelevantExperience then
                 check "HasPracticalExperience_Edit"
 
+            sleep 1
             (xpath "/html/body/form/div[4]/div[2]/div[2]/div[2]/div/div/table[1]/tbody/tr[2]/td/table[2]/tbody/tr/td/div[1]/div/table/tbody/tr[2]/td/table/tbody/tr/td/table/tbody/tr/td[1]/input") << string (snd workType)
+            sleep 1
         with
         | _ -> ()
 
         press enter
+        sleep 2
 
 let wipeOutTeachers () =
     switchTab Teachers
-
-    let length () = 
-        sleep 1
-        elements "img[title='Отменить нагрузку']" |> Seq.length
-
-    let mutable quickPassCounter = (length ()) - 3
-
-    while quickPassCounter > 0 do
-        tryUntilDone (fun () -> 
-            let eraser = elements "img[title='Отменить нагрузку']" |> Seq.skip (quickPassCounter / 2) |> Seq.head
-            click eraser
-        )
-        quickPassCounter <- quickPassCounter - 1
-
-    let mutable lastLength = length ()
-    let mutable isDone = false
-    let mutable offset = 0
-    while not isDone do
-        while ((length ()) = lastLength && offset < lastLength) do
-            tryUntilDone (fun () -> 
-                let eraser = elements "img[title='Отменить нагрузку']" |> Seq.skip offset |> Seq.head
-                click eraser
-            )
-            if length () = lastLength then 
-                offset <- offset + 1
-        lastLength <- length ()
-        isDone <- offset >= lastLength
+    click "tr[id*='HeadersRow'] span[id*='WorkKindTeachers']"
+    sleep 2
+    click "img[src*='Action_Clear']"
+    sleep 1
 
 let wipeOutRooms () =
     switchTab Rooms
-    sleep 2
-    if (elements "span[title='Состояние выбранных строк на всех страницах']" |> Seq.length) > 1 then
+    sleep 1
+    let removalElements = elements "span[title='Состояние выбранных строк на всех страницах']"
+    if (element "tr[id*='StudyModuleWorkKindRooms'] + tr").Text <> "Нет данных для отображения" then
+        if (removalElements |> Seq.length) > 1 then
+            removalElements |> Seq.skip 1 |> Seq.head |> click
+        if (removalElements |> Seq.length) = 1 then
+            click "span[title='Состояние выбранных строк на всех страницах']"
         sleep 1
-        elements "span[title='Состояние выбранных строк на всех страницах']" |> Seq.skip 1 |> Seq.head |> click
-        sleep 1
-        element "img[src*='Action_Delete']" |> click
+        click "img[src*='Action_Delete']"
         sleep 1
 
 let removeWorkTypes offset count =
     switchTab Teachers
     sleep 1
-    for _ in [0..count - 1] do
-        let eraser = elements "img[title='Отменить нагрузку']" |> Seq.skip offset |> Seq.head
-        click eraser
-        sleep 2
+    let checkboxes = 
+        (elements "table[id*='WorkKindTeachers'] span[id*='WorkKindTeachers']") 
+        |> Seq.skip (1 + offset) |> Seq.take count |> Seq.toList
+    
+    checkboxes |> Seq.iter (fun e -> click e; sleep 1)
+    click "img[src*='Action_Clear']"
+    sleep 1
 
 let refresh () =
-    sleep 1
-    click "img[src*='Action_Refresh']"
+    tryUntilDone (fun () -> click "img[src*='Action_Refresh']")
     sleep 2
 
 let correctTeachersData (workTypes: Map<string, int>) =
@@ -253,6 +299,7 @@ let getDisciplineNameFromTable row =
     (elements "td[onclick*='GVScheduleCommand'] + td + td + td + td + td + td" |> Seq.skip (row - 1) |> Seq.head).Text
 
 let getSemesterFromTable row =
+    sleep 1
     let semester = (elements "td[onclick*='GVScheduleCommand'] + td + td + td" |> Seq.skip (row - 1) |> Seq.head).Text
     semester.Replace("Семестр ", "") |> int
 
@@ -261,7 +308,11 @@ let getRecordCaption () =
 
 let backToTable () =
     click "a[href*='StudyModule_ListView']"
-    sleep 3
+    sleep 4
+
+let markAsDone () =
+    tryUntilDone (fun () -> click "a[title*='Установить статус записи в \"Обработана\"']")
+    sleep 1
 
 let tableSize () =
     ((elements "table[id*='MainTable'] > tbody > tr") |> Seq.length) - 1

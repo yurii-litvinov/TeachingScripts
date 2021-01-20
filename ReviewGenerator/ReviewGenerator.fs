@@ -24,10 +24,11 @@ let main argv =
     printfn "Connecting to Google Sheets..."
 
     let spreadsheetId = argv.[0]
+    let offset = argv.[1]
     let page = "Form Responses 1"
     use service = openGoogleSheet "AssignmentMatcher" 
 
-    let sheet = readGoogleSheet service spreadsheetId page "A" "P" 2
+    let sheet = readGoogleSheet service spreadsheetId page "A" "P" offset
 
     let works = sheet 
                 |> Seq.map(fun line -> 

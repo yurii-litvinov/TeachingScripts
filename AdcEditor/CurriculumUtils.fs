@@ -2,11 +2,21 @@
 
 open CurriculumParser
 
+let lectionWorkTypes = ["Лекции"; "Консультации"; "Коллоквиумы"; "Промежуточная аттестация (экз)"]
+let practiceWorkTypes = [
+    "Семинары" 
+    "Практические занятия"
+    "Лабораторные работы"
+    "Контрольные работы"
+    "Текущий контроль (ауд)"
+    "Промежуточная аттестация (зач)"
+    "Под руководством преподавателя"
+    "В присутствии преподавателя"]
+
 type Curriculum(fileName: string) =
     let curriculum = DocxCurriculum(fileName)
 
     member _.GetWorkTypes disciplineName semester =
-    
         let curriculumDiscipline = curriculum.Disciplines |> Seq.find(fun d -> d.RussianName = disciplineName)
         let impl = curriculumDiscipline.Implementations |> Seq.find(fun d -> d.Semester = semester)
         let workHours = impl.WorkHours.Split [|' '|] |> Seq.rev |> Seq.skip 4 |> Seq.rev |> Seq.map int
@@ -44,10 +54,8 @@ type Curriculum(fileName: string) =
 
     member v.GetLectionWorkTypes disciplineName semester =
         let workTypes = v.GetWorkTypes disciplineName semester
-        let lectionWorkTypes = ["Лекции"; "Консультации"; "Коллоквиумы"; "Промежуточная аттестация (экз)"]
         workTypes |> List.filter (fun wt -> List.contains (fst wt) lectionWorkTypes)
 
     member v.GetPracticeWorkTypes disciplineName semester =
         let workTypes = v.GetWorkTypes disciplineName semester
-        let practiceWorkTypes = ["Семинары"; "Практические занятия"; "Лабораторные работы"; "Контрольные работы"; "Текущий контроль (ауд)"; "Промежуточная аттестация (зач)"]
         workTypes |> List.filter (fun wt -> List.contains (fst wt) practiceWorkTypes)

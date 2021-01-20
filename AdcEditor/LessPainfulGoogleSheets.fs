@@ -47,7 +47,11 @@ let readGoogleSheet (service: SheetsService) spreadsheetId sheet startColumn end
 
     let request = service.Spreadsheets.Values.Get(spreadsheetId, range)
 
-    request.Execute().Values |> Seq.map (Seq.map string)
+    let values = request.Execute().Values 
+    if values <> null then
+        values |> Seq.map (Seq.map string)
+    else
+        Seq.empty
 
 let readGoogleSheetColumn (service: SheetsService) spreadsheetId sheet column offset =
     let column = readGoogleSheet service spreadsheetId sheet column column offset

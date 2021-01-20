@@ -45,3 +45,6 @@ type EnglishTeachers (workPlan: string) =
 
     member _.Teachers semester trajectory =
         data.[semester].[trajectory]
+
+    member _.HaveData semester trajectory =
+        data.ContainsKey semester && data.[semester].ContainsKey trajectory

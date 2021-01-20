@@ -8,3 +8,4 @@ type WorkloadInfo =
 
 type IWorkDistribution =
     abstract Teachers: semester: int -> discipline: string -> WorkloadInfo
+    abstract HaveData: semester: int -> discipline: string -> bool
