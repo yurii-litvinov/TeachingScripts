@@ -4,6 +4,7 @@ open System.Text.RegularExpressions
 
 open LessPainfulGoogleSheets
 open ProgramContentChecker
+open ProgramPatcher
 
 let plansFolder = "../.."
 let programsFolder = "../.."
@@ -24,9 +25,11 @@ let owners =
     |> Map.ofList
 
 let exclusions =
+    // Общеуниверситетские дисциплины
     ["057495"; "057596"; "058037"; "058039"; "058041"; "059998"; "060000"; "060008"; "060009"; "060010"; "060059"; 
-        "062762"; "700000"; "800000"; "900000"]  // Общеуниверситетские дисциплины
-    @ ["064764"; "064792"; "064793"; "064795"; "064797"]  // РПП, у них совсем другой формат
+        "062762"; "700000"; "800000"; "900000"]
+    // РПП СВ.5162, у них совсем другой формат
+    @ ["064764"; "064792"; "064793"; "064795"; "064797"]
 
 let isProgramNameOk fileName =
     let matches = Regex.Match(fileName, @"^\d{6}_(\w|\s|\+|-|\.|,)+_\d{2}_\d{4}_\d(-\d)?с_\w+.docx$")
@@ -148,7 +151,15 @@ let removeExcluded planName =
 
 let checkContent planName =
     Directory.EnumerateFiles $"{programsFolder}/{planName}"
-    |> Seq.iter checkProgram
+    |> Seq.map FileInfo
+    |> Seq.filter (fun p -> excluded (getCode p.Name) |> not)
+    |> Seq.iter (fun p -> checkProgram p.FullName)
+
+let patchPrograms planName =
+    Directory.EnumerateFiles $"{programsFolder}/{planName}"
+    |> Seq.map FileInfo
+    |> Seq.filter (fun p -> excluded (getCode p.Name) |> not)
+    |> Seq.iter (fun p -> patchProgram p.FullName)
 
 let printHelp () =
     printfn "Welcome to RPD Patcher, an utility to fix working programs of SPbSU!"
@@ -171,5 +182,8 @@ let main argv =
         | "--auto-rename" | "-r" -> autoRename argv.[1]
         | "--delete-excluded" -> removeExcluded argv.[1]
         | "--check-content" | "-c" -> checkContent argv.[1]
+        | "--check-program" | "-cp" -> checkProgram argv.[1]
+        | "--patch" | "-p" -> patchPrograms argv.[1]
+        | "--patch-program" | "-pp" -> patchProgram argv.[1]
         | _ -> printHelp ()
     0
