@@ -162,12 +162,22 @@ let patchPrograms planName =
     |> Seq.iter (fun p -> patchProgram p.FullName)
 
 let printHelp () =
-    printfn "Welcome to RPD Patcher, an utility to fix working programs of SPbSU!"
+    printfn "Welcome to RPD Patcher, an utility to fix working programs of SPbSU."
     printfn "Usage:"
     printfn "\tdotnet run -- -i <working plan name>"
     printfn "\t\t- check that all working programs are present and named correctly."
     printfn "\tdotnet run -- -r <working plan name>"
     printfn "\t\t- try to automatically rename working programs if they are in incorrect format."
+    printfn "\tdotnet run -- --delete-excluded <working plan name>"
+    printfn "\t\t- deletes working programs listed as 'excluded' for this working plan, use with caution!"
+    printfn "\tdotnet run -- -c <working plan name>"
+    printfn "\t\t- check that all working programs have correct structure and content (common mistakes are detected, false positives are possible)."
+    printfn "\tdotnet run -- -cp <working program file name>"
+    printfn "\t\t- checks that given working program has correct structure and content (common mistakes are detected, false positives are possible)."
+    printfn "\tdotnet run -- -p <working plan name>"
+    printfn "\t\t- automagically fixes some common mistakes in all working programs. Verification, with linter ('-c' option) and manual, is strongly advised."
+    printfn "\tdotnet run -- -pp <working program file name>"
+    printfn "\t\t- automagically fixes some common mistakes in a given working program. Verification, with linter ('-cp' option) and manual, is strongly advised."
     printfn ""
     printfn "Supported working plans:"
     plans |> Map.iter (fun key _ -> printf "%s " key)
