@@ -1,0 +1,11 @@
+image: Visual Studio 2019
+
+init:
+  - git config --global core.autocrlf input
+
+build_script:
+  - dotnet build RpdPatcher
+  - dotnet build AdcEditor
+  - dotnet build ReviewGenerator
+
+test: off
