@@ -133,7 +133,8 @@ let parseProgramFile (programFileName: string) : (ProgramContent * string list) 
         use wordDocument = WordprocessingDocument.Open(programFileName, false)
         parseProgram wordDocument
     with
-    | :? OpenXmlPackageException -> 
+    | :? OpenXmlPackageException
+    | :? InvalidDataException ->
         printfn "%s настолько коряв, что даже не читается, пропущен" programFileName
         (Map.empty, [])
 

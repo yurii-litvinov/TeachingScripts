@@ -75,6 +75,8 @@ let patchSection (body: Body) (sectionName: string) (replaceTo: string list) =
             for replacePart in replaceTo |> List.rev do
                 let paragraph = createParagraph replacePart Stretch false false
                 sectionHeader.InsertAfterSelf paragraph |> ignore
+    else
+        printfn "Секция '%s' не найдена, замена не произведена!" sectionName
 
 let addGovernmentIfNeeded (body: Body) =
     let text = body.InnerText.TrimStart()
@@ -96,6 +98,10 @@ let fixTextInRun (body: Body) (from: string) (replaceTo: string) =
         printfn "Меняю '%s' на '%s'" from replaceTo
         text.Value.Text <- replaceTo
 
+let fixTextEverywhere (body: Body) (from: string) (replaceTo: string) =
+    body.Descendants<Text>()
+    |> Seq.iter (fun t -> t.Text <- t.Text.Replace(from, replaceTo))
+
 let addLiterature (body: Body) =
     let sectionHeader = findParagraph body "Перечень иных информационных источников"
     if sectionHeader.IsSome then
@@ -114,6 +120,8 @@ let addLiterature (body: Body) =
         |> List.iter (fun s ->
             let p = createParagraph s Stretch false false
             sectionHeader.InsertAfterSelf p |> ignore)
+    else
+        printfn "'Перечень иных информационных источников' не найдел, литература не сгенерирована!" 
 
 let addCompetencesToAttestationMaterials (content: ProgramContent) (curriculum: Curriculum) (body: Body) (disciplineCode: string) =
     if content |> controlMaterialsShallReferenceCompetences |> List.isEmpty |> not then
@@ -167,22 +175,36 @@ let addCompetencesToAttestationMaterials (content: ProgramContent) (curriculum: 
 
                 let p = createParagraph "Сформированность компетенций считается пропорционально доле успешных ответов на вопросы и выполненности заданий." Stretch false true
                 competencesParagraph.InsertAfterSelf p |> ignore
-
+            else
+                printfn "'Методические материалы для оценки обучающимися содержания и качества учебного процесса' не удалось найти, список проверяемых ФОС компетенций не сгенерирован!"
+        else
+            printfn "'Методические материалы для проведения текущего контроля успеваемости и промежуточной аттестации' не удалось найти, компетенции в ФОС и шкалы оценивания не сгенерированы!"
 
 let fixStudent (content: ProgramContent) (body: Body) =
     if content |> noStudent |> List.isEmpty |> not then
         printfn "Пытаюсь заменить запрещённое слово 'студент' на 'обучающийся'"
-        fixTextInRun body "студента" "обучающегося"
-        fixTextInRun body "студенту" "обучающемуся"
-        fixTextInRun body "студентом" "обучающимся"
-        fixTextInRun body "студенте" "обучающемся"
-        fixTextInRun body "студент" "обучающийся"
 
-        fixTextInRun body "Студента" "Обучающегося"
-        fixTextInRun body "Студенту" "Обучающемуся"
-        fixTextInRun body "Студентом" "Обучающимся"
-        fixTextInRun body "Студенте" "Обучающемся"
-        fixTextInRun body "Студент" "Обучающийся"
+        fixTextEverywhere body "студентами" "обучающимися"
+        fixTextEverywhere body "студентам" "обучающимся"
+        fixTextEverywhere body "студентах" "обучающихся"
+        fixTextEverywhere body "студента" "обучающегося"
+        fixTextEverywhere body "студенте" "обучающемся"
+        fixTextEverywhere body "студентов" "обучающихся"
+        fixTextEverywhere body "студентом" "обучающимся"
+        fixTextEverywhere body "студенту" "обучающемуся"
+        fixTextEverywhere body "студенты" "обучающиеся"
+        fixTextEverywhere body "студент" "обучающийся"
+
+        fixTextEverywhere body "Студентами" "Обучающимися"
+        fixTextEverywhere body "Студентам" "Обучающимся"
+        fixTextEverywhere body "Студентах" "Обучающихся"
+        fixTextEverywhere body "Студента" "Обучающегося"
+        fixTextEverywhere body "Студенте" "Обучающемся"
+        fixTextEverywhere body "Студентов" "Обучающихся"
+        fixTextEverywhere body "Студентом" "Обучающимся"
+        fixTextEverywhere body "Студенту" "Обучающемуся"
+        fixTextEverywhere body "Студенты" "Обучающиеся"
+        fixTextEverywhere body "Студент" "Обучающийся"
 
 let patchProgram (curriculumFile: string) (programFileName: string) =
     try
@@ -226,5 +248,6 @@ let patchProgram (curriculumFile: string) (programFileName: string) =
 
         wordDocument.Save()
     with
-    | :? OpenXmlPackageException -> 
+    | :? OpenXmlPackageException
+    | :? InvalidDataException ->
         printfn "%s настолько коряв, что даже не читается, пропущен" programFileName
