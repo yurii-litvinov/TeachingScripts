@@ -6,46 +6,36 @@ open LessPainfulGoogleSheets
 open ProgramContentChecker
 open ProgramPatcher
 
-let plansFolder = "../.."
-let programsFolder = "../.."
+let plansFolder = "WorkingPlans"
 
-let plans = 
-    [ "5162-2020", "СВ.5162-2020.docx"
-      "5006-2019", "СВ.5006-2019.docx"
-      "5006-2018", "СВ.5006-2018.docx"
-      "5006-2017", "СВ.5006-2017.docx"
-      "5006-2020", "ВМ.5665-2020.docx"
-      "5006-2019", "ВМ.5665-2019.docx" ]
-    |> List.map (fun x -> (fst x, $"{plansFolder}/{snd x}"))
-    |> Map.ofList
-
-let owners =
-    [ "5162-2020", ("1aP3biZf9vVMLG26Ra3acreMW2iZLCoXz93WPqK2ZV-U", "2020")
-    ]
-    |> Map.ofList
-
-let exclusions =
-    // Общеуниверситетские дисциплины
-    ["057495"; "057596"; "058037"; "058039"; "058041"; "059998"; "060000"; "060008"; "060009"; "060010"; "060059"; 
-        "062762"; "700000"; "800000"; "900000"]
-    // РПП СВ.5162, у них совсем другой формат
-    @ ["064764"; "064792"; "064793"; "064795"; "064797"]
+let owners = Config.owners |> Map.ofList
 
 let isProgramNameOk fileName =
     let matches = Regex.Match(fileName, @"^\d{6}_(\w|\s|\+|-|\.|,)+_\d{2}_\d{4}_\d(-\d)?с_\w+.docx$")
     matches.Success
 
 let excluded code =
-    exclusions |> List.contains code
+    Config.exclusions |> List.contains code
 
 let getCode (disciplineFileName: string) =
     disciplineFileName.Substring(0, 6)
 
-let inventorize planName =
-    let curriculum = DocxCurriculum(plans.[planName])
+let planNameToCode fileName =
+    FileInfo(fileName).Name.Substring(3, "9999-2084".Length)
+
+let planCodeToFileName planCode =
+    Directory.EnumerateFiles plansFolder
+    |> Seq.find (fun f -> planNameToCode f = planCode)
+
+let isKnownPlanCode planCode =
+    Directory.EnumerateFiles plansFolder
+    |> Seq.exists (fun f -> planNameToCode f = planCode)
+
+let inventorize planCode programsFolder =
+    let curriculum = DocxCurriculum(planCodeToFileName planCode)
     let disciplines = curriculum.Disciplines
     let programs = 
-        Directory.EnumerateFiles $"{programsFolder}/{planName}"
+        Directory.EnumerateFiles programsFolder
         |> Seq.map (fun p -> FileInfo(p).Name)
 
     let printMissingDisciplines () =
@@ -55,9 +45,9 @@ let inventorize planName =
             |> Seq.filter (fun d -> programs |> Seq.tryFind (fun s -> s.Contains(d.Code)) |> Option.isNone)
 
         if missingDisciplines |> Seq.isEmpty then
-            printfn "Everything present!"
+            printfn "Всё в порядке."
         else
-            printfn "Missing working programs:"
+            printfn "Отсутствующие рабочие программы:"
             missingDisciplines
             |> Seq.sortBy (fun d -> d.Code)
             |> Seq.iter (fun d -> printfn "[%s] %s" d.Code d.RussianName)
@@ -73,7 +63,7 @@ let inventorize planName =
 
         if unneededPrograms |> Seq.isEmpty |> not then
             printfn ""
-            printfn "There are working programs not from a working plan:"
+            printfn "РПД, которых нет в учебном плане:"
             unneededPrograms
             |> Seq.sort 
             |> Seq.iter (printfn "%s")
@@ -86,7 +76,7 @@ let inventorize planName =
 
         if incorrectlyNamedPrograms |> Seq.isEmpty |> not then
             printfn ""
-            printfn "Incorrectly named working programs:"
+            printfn "Неправильно названные РПД:"
             incorrectlyNamedPrograms
             |> Seq.sort 
             |> Seq.iter (printfn "%s")
@@ -95,24 +85,24 @@ let inventorize planName =
     printUnneededPrograms ()
     printIncorrectlyNamedPrograms ()
 
-let loadDisciplineOwners planName =
+let loadDisciplineOwners planCode =
     let service = openGoogleSheet "AssignmentMatcher"
-    let sheet, page = owners.[planName]
+    let sheet, page = owners.[planCode]
     let rawData = readGoogleSheet service sheet page "A" "B" 2
     rawData
     |> Seq.map (fun row -> (row |> Seq.head, if Seq.length row >= 2 then row |> Seq.item 1 else ""))
     |> Seq.map (fun (name, owner) -> (name.Substring(1, 6), owner.Split [|' '|] |> Array.item 0))
     |> Map.ofSeq
 
-let autoRename planName =
-    let curriculum = DocxCurriculum(plans.[planName])
+let autoRename planCode programsFolder =
+    let curriculum = DocxCurriculum(planCodeToFileName planCode)
     let disciplines = curriculum.Disciplines
-    let owners = loadDisciplineOwners planName
+    let owners = loadDisciplineOwners planCode
 
     let findDiscipline code = disciplines |> Seq.find (fun d -> d.Code = code)
 
     let programs = 
-        Directory.EnumerateFiles $"{programsFolder}/{planName}"
+        Directory.EnumerateFiles programsFolder
         |> Seq.map FileInfo
 
     programs
@@ -132,68 +122,79 @@ let autoRename planName =
             let owner = if owners.ContainsKey code then owners.[code] else ""
 
             if p.Extension <> ".docx" then
-                printfn "Not going to rename %s, it is in wrong format!" p.Name
+                printfn "Файл '%s' не будет переименован, он не .docx!" p.Name
             elif owner = "" then
-                printfn "Not going to rename %s, unknown owner!" p.Name
+                printfn "Файл '%s' не будет переименован, неизвестен 'хозяин' дисциплины (см. соответствующую таблицу в Google Docs)!" p.Name
             else
                 let newName = $"{code}_{name}_{year}_{curriculumCode}_{semesterPart}с_{owner}.docx"
-                printfn "Going to rename %s to %s" p.Name newName
                 p.MoveTo($"{p.DirectoryName}/{newName}")
+                printfn "Файл '%s' переименован в  '%s'" p.Name newName
         )
 
-let removeExcluded planName =
-    Directory.EnumerateFiles $"{programsFolder}/{planName}"
+let deleteExcluded programsFolder =
+    Directory.EnumerateFiles programsFolder
     |> Seq.map FileInfo
     |> Seq.filter (fun p -> excluded (getCode p.Name))
     |> Seq.iter (fun p -> 
-        printfn "Removing %s" p.Name
+        printfn "Удаляю '%s'" p.Name
         p.Delete ())
 
-let checkContent planName =
-    Directory.EnumerateFiles $"{programsFolder}/{planName}"
+let checkContent programsFolder =
+    Directory.EnumerateFiles programsFolder
     |> Seq.map FileInfo
     |> Seq.filter (fun p -> excluded (getCode p.Name) |> not)
     |> Seq.iter (fun p -> checkProgram p.FullName)
 
-let patchPrograms planName =
-    Directory.EnumerateFiles $"{programsFolder}/{planName}"
+let patchPrograms planCode programsFolder =
+    Directory.EnumerateFiles programsFolder
     |> Seq.map FileInfo
     |> Seq.filter (fun p -> excluded (getCode p.Name) |> not)
-    |> Seq.iter (fun p -> patchProgram p.FullName)
+    |> Seq.iter (fun p -> patchProgram (planCodeToFileName planCode) p.FullName)
+
+let patchProgram planCode programFileName =
+    ProgramPatcher.patchProgram (planCodeToFileName planCode) programFileName
 
 let printHelp () =
-    printfn "Welcome to RPD Patcher, an utility to fix working programs of SPbSU."
-    printfn "Usage:"
-    printfn "\tdotnet run -- -i <working plan name>"
-    printfn "\t\t- check that all working programs are present and named correctly."
-    printfn "\tdotnet run -- -r <working plan name>"
-    printfn "\t\t- try to automatically rename working programs if they are in incorrect format."
-    printfn "\tdotnet run -- --delete-excluded <working plan name>"
-    printfn "\t\t- deletes working programs listed as 'excluded' for this working plan, use with caution!"
-    printfn "\tdotnet run -- -c <working plan name>"
-    printfn "\t\t- check that all working programs have correct structure and content (common mistakes are detected, false positives are possible)."
-    printfn "\tdotnet run -- -cp <working program file name>"
-    printfn "\t\t- checks that given working program has correct structure and content (common mistakes are detected, false positives are possible)."
-    printfn "\tdotnet run -- -p <working plan name>"
-    printfn "\t\t- automagically fixes some common mistakes in all working programs. Verification, with linter ('-c' option) and manual, is strongly advised."
-    printfn "\tdotnet run -- -pp <working program file name>"
-    printfn "\t\t- automagically fixes some common mistakes in a given working program. Verification, with linter ('-cp' option) and manual, is strongly advised."
+    printfn "Добро пожаловать в RPD Patcher, утилиту для проверки и автоматических исправлений РПД СПбГУ."
+    printfn "Использование:"
+    printfn "\tdotnet run -- -i <номер рабочего плана и год> <папка с РПД>"
+    printfn "\t\t- проверить, что все РПД в наличии и канонично называются."
+    printfn "\tdotnet run -- -r <номер рабочего плана и год> <папка с РПД>"
+    printfn "\t\t- автоматически переименовать РПД, если их имена не в каноничном формате. Требует авторизации в Google Drive."
+    printfn "\tdotnet run -- --delete-excluded <папка с РПД>"
+    printfn "\t\t- удалить из папки все РПД, перечисленные в списке 'исключённые' в конфиге. Используйте с осторожностью!"
+    printfn "\tdotnet run -- -c <номер рабочего плана и год> <папка с РПД>"
+    printfn "\t\t- проверить структуру и содержимое всех РПД в папке. Проверяет следование приказу 539/1 от 17.02.2014 о форме РПД, ищет нарушения приказа 1395/1 и типичные ошибки."
+    printfn "\tdotnet run -- -cp <файл РПД>"
+    printfn "\t\t- как '-c', только для одной РПД."
+    printfn "\tdotnet run -- -p <номер рабочего плана и год> <папка с РПД>"
+    printfn "\t\t- автомагически исправляет типичные ошибки во всех РПД в папке и приводит их в соответствие приказу 1395/1. После этого ТРЕБУЕТСЯ ручная проверка!"
+    printfn "\tdotnet run -- -pp <файл РПД>"
+    printfn "\t\t- как '-p', только для одной РПД."
     printfn ""
-    printfn "Supported working plans:"
-    plans |> Map.iter (fun key _ -> printf "%s " key)
+    printfn "Имеющиеся рабочие планы:"
+    Directory.EnumerateFiles(plansFolder) 
+    |> Seq.map (fun p -> FileInfo(p).Name.Substring(3, "9999-2084".Length))
+    |> Seq.iter (printf "%s ")
 
 [<EntryPoint>]
 let main argv =
     if argv.Length < 2 then
         printHelp ()
     else
+        let call f =
+            if argv.Length < 3 then
+                printHelp ()
+            else
+                f argv.[1] argv.[2]
+
         match argv.[0] with
-        | "--inventorize" | "-i" -> inventorize argv.[1]
-        | "--auto-rename" | "-r" -> autoRename argv.[1]
-        | "--delete-excluded" -> removeExcluded argv.[1]
+        | "--inventorize" | "-i" -> call inventorize 
+        | "--auto-rename" | "-r" -> call autoRename
+        | "--delete-excluded" -> deleteExcluded argv.[1]
         | "--check-content" | "-c" -> checkContent argv.[1]
         | "--check-program" | "-cp" -> checkProgram argv.[1]
-        | "--patch" | "-p" -> patchPrograms argv.[1]
-        | "--patch-program" | "-pp" -> patchProgram argv.[1]
+        | "--patch" | "-p" -> call patchPrograms
+        | "--patch-program" | "-pp" -> call patchProgram
         | _ -> printHelp ()
     0

@@ -6,6 +6,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="Config.fs" />
+    <Compile Include="CurriculumUtils.fs" />
     <Compile Include="LessPainfulGoogleSheets.fs" />
     <Compile Include="ProgramContentChecker.fs" />
     <Compile Include="ProgramPatcher.fs" />

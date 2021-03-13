@@ -62,73 +62,76 @@ let parse (steps: ParserStep list) inputString =
                 let recover = state.Input.IndexOf n.Prefix
                 if recover = -1 then
                     // Failed. Skipping step, reporting our error and hoping that next step will be more successful in recovery.
-                    parseRec (n :: t) { state with Errors = $"Not found {h.Prefix}, seen '{state.Input.Substring(0, 20)}...'" :: state.Errors }
+                    parseRec (n :: t) { state with Errors = $"Не найден '{h.Prefix}', вместо него '{state.Input.Substring(0, 30)}...'" :: state.Errors }
                 else
                     // Succeeded. Skipping input until next prefix.
                     let newInput = state.Input.Substring(recover)
-                    parseRec (n :: t) { state with Input = newInput; Errors = $"Not found {h.Prefix}, seen '{state.Input.Substring(0, 30)}..." :: state.Errors }
+                    parseRec (n :: t) { state with Input = newInput; Errors = $"Не найден {h.Prefix}, вместо него '{state.Input.Substring(0, 30)}..." :: state.Errors }
         | h :: [] ->
             // Last step, parsed string is everything until end.
             if state.Input.StartsWith h.Prefix then
                 let content = state.Input.Substring(h.Prefix.Length).Trim()
                 { state with Input = ""; Output = h.Action content state.Output }
             else
-                { state with Input = ""; Errors = $"Not found {h.Prefix}" :: state.Errors }
+                { state with Input = ""; Errors = $"Не найден {h.Prefix}" :: state.Errors }
 
     let steps = relaxSectionTitleParsing steps []
     let state = parseRec steps {Input = inputString; Output = Map.empty; Errors = []}
     (state.Output, state.Errors |> List.rev)
 
-let parseProgram (programFileName: string) : (ProgramContent * string list) =
+let parseProgram (document: WordprocessingDocument) : (ProgramContent * string list) =
+    let body = document.MainDocumentPart.Document.Body
+    let text = body.InnerText.Trim ()
+
+    let note field = fun s (c: Map<string, string>) -> c.Add(field, s)
+
+    let parser = 
+        [ accept "Правительство Российской Федерации" 
+          accept "Санкт-Петербургский государственный университет" 
+          parseAfter "Р А Б О Ч А Я   П Р О Г Р А М М АУЧЕБНОЙ ДИСЦИПЛИНЫ" note
+          accept "Язык(и) обучения"
+          skip
+          parseAfter "Трудоемкость в зачетных единицах: " note
+          parseAfter "Регистрационный номер рабочей программы: " note
+          parseAfter "Санкт-Петербург" note
+          accept "Раздел 1. Характеристики учебных занятий"
+          parseAfter "1.1. Цели и задачи учебных занятий" note
+          parseAfter "1.2. Требования к подготовленности обучающегося к освоению содержания учебных занятий (пререквизиты)" note
+          parseAfter "1.3. Перечень результатов обучения (learning outcomes)" note
+          parseAfter "1.4. Перечень и объём активных и интерактивных форм учебных занятий" note
+          accept "Раздел 2. Организация, структура и содержание учебных занятий"
+          accept "2.1. Организация учебных занятий" 
+          accept "2.1.1. Основной курс" 
+          skip
+          parseAfter "2.2. Структура и содержание учебных занятий" note
+          accept "Раздел 3. Обеспечение учебных занятий"
+          accept "3.1. Методическое обеспечение"
+          parseAfter "3.1.1. Методические указания по освоению дисциплины" note
+          parseAfter "3.1.2. Методическое обеспечение самостоятельной работы" note 
+          parseAfter "3.1.3. Методика проведения текущего контроля успеваемости и промежуточной аттестации и критерии оценивания" note
+          parseAfter "3.1.4. Методические материалы для проведения текущего контроля успеваемости и промежуточной аттестации (контрольно-измерительные материалы, оценочные средства)" note
+          parseAfter "3.1.5. Методические материалы для оценки обучающимися содержания и качества учебного процесса" note
+          accept "3.2. Кадровое обеспечение"
+          parseAfter "3.2.1. Образование и (или) квалификация штатных преподавателей и иных лиц, допущенных к проведению учебных занятий" note
+          parseAfter "3.2.2. Обеспечение учебно-вспомогательным и (или) иным персоналом" note
+          accept "3.3. Материально-техническое обеспечение"
+          parseAfter "3.3.1. Характеристики аудиторий (помещений, мест) для проведения занятий" note
+          parseAfter "3.3.2. Характеристики аудиторного оборудования, в том числе неспециализированного компьютерного оборудования и программного обеспечения общего пользования" note
+          parseAfter "3.3.3. Характеристики специализированного оборудования" note
+          parseAfter "3.3.4. Характеристики специализированного программного обеспечения" note
+          parseAfter "3.3.5. Перечень и объёмы требуемых расходных материалов" note
+          accept "3.4. Информационное обеспечение"
+          parseAfter "3.4.1. Список обязательной литературы" note
+          parseAfter "3.4.2. Список дополнительной литературы" note
+          parseAfter "3.4.3. Перечень иных информационных источников" note
+          parseAfter "Раздел 4. Разработчики программы" note ]
+
+    parse parser text
+
+let parseProgramFile (programFileName: string) : (ProgramContent * string list) =
     try
         use wordDocument = WordprocessingDocument.Open(programFileName, false)
-        let body = wordDocument.MainDocumentPart.Document.Body
-        let text = body.InnerText.Trim ()
-
-        let note field = fun s (c: Map<string, string>) -> c.Add(field, s)
-
-        let parser = 
-            [ accept "Правительство Российской Федерации" 
-              accept "Санкт-Петербургский государственный университет" 
-              parseAfter "Р А Б О Ч А Я   П Р О Г Р А М М АУЧЕБНОЙ ДИСЦИПЛИНЫ" note
-              accept "Язык(и) обучения"
-              skip
-              parseAfter "Трудоемкость в зачетных единицах: " note
-              parseAfter "Регистрационный номер рабочей программы: " note
-              parseAfter "Санкт-Петербург" note
-              accept "Раздел 1. Характеристики учебных занятий"
-              parseAfter "1.1. Цели и задачи учебных занятий" note
-              parseAfter "1.2. Требования к подготовленности обучающегося к освоению содержания учебных занятий (пререквизиты)" note
-              parseAfter "1.3. Перечень результатов обучения (learning outcomes)" note
-              parseAfter "1.4. Перечень и объём активных и интерактивных форм учебных занятий" note
-              accept "Раздел 2. Организация, структура и содержание учебных занятий"
-              accept "2.1. Организация учебных занятий" 
-              accept "2.1.1. Основной курс" 
-              skip
-              parseAfter "2.2. Структура и содержание учебных занятий" note
-              accept "Раздел 3. Обеспечение учебных занятий"
-              accept "3.1. Методическое обеспечение"
-              parseAfter "3.1.1. Методические указания по освоению дисциплины" note
-              parseAfter "3.1.2. Методическое обеспечение самостоятельной работы" note 
-              parseAfter "3.1.3. Методика проведения текущего контроля успеваемости и промежуточной аттестации и критерии оценивания" note
-              parseAfter "3.1.4. Методические материалы для проведения текущего контроля успеваемости и промежуточной аттестации (контрольно-измерительные материалы, оценочные средства)" note
-              parseAfter "3.1.5. Методические материалы для оценки обучающимися содержания и качества учебного процесса" note
-              accept "3.2. Кадровое обеспечение"
-              parseAfter "3.2.1. Образование и (или) квалификация штатных преподавателей и иных лиц, допущенных к проведению учебных занятий" note
-              parseAfter "3.2.2. Обеспечение учебно-вспомогательным и (или) иным персоналом" note
-              accept "3.3. Материально-техническое обеспечение"
-              parseAfter "3.3.1. Характеристики аудиторий (помещений, мест) для проведения занятий" note
-              parseAfter "3.3.2. Характеристики аудиторного оборудования, в том числе неспециализированного компьютерного оборудования и программного обеспечения общего пользования" note
-              parseAfter "3.3.3. Характеристики специализированного оборудования" note
-              parseAfter "3.3.4. Характеристики специализированного программного обеспечения" note
-              parseAfter "3.3.5. Перечень и объёмы требуемых расходных материалов" note
-              accept "3.4. Информационное обеспечение"
-              parseAfter "3.4.1. Список обязательной литературы" note
-              parseAfter "3.4.2. Список дополнительной литературы" note
-              parseAfter "3.4.3. Перечень иных информационных источников" note
-              parseAfter "Раздел 4. Разработчики программы" note ]
-
-        parse parser text
+        parseProgram wordDocument
     with
     | :? OpenXmlPackageException -> 
         printfn "%s настолько коряв, что даже не читается, пропущен" programFileName
@@ -243,7 +246,7 @@ let libraryLinksShallPresent (content: ProgramContent) =
         []
 
 let checkProgram (programFileName: string) =
-    let content, errors = parseProgram programFileName
+    let content, errors = parseProgramFile programFileName
 
     let checkingResults = 
         [ checkEveryFieldFilled
