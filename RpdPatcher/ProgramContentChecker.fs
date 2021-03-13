@@ -155,6 +155,7 @@ let noStudent (content: ProgramContent) =
 let shallContainCompetences (content: ProgramContent) =
     if content.ContainsKey "1.3. Перечень результатов обучения (learning outcomes)"
         && not (content.["1.3. Перечень результатов обучения (learning outcomes)"].Contains "компетенц") 
+        && not (content.["1.3. Перечень результатов обучения (learning outcomes)"].Contains "Компетенц") 
     then
         [ "Перечень результатов обучения не содержит указания на компетенции." ]
     else
