@@ -174,7 +174,7 @@ let addCompetencesToAttestationMaterials (content: ProgramContent) (curriculum: 
                 sectionHeader.InsertBeforeSelf p |> ignore
 
                 let p = createParagraph "Сформированность компетенций считается пропорционально доле успешных ответов на вопросы и выполненности заданий." Stretch false true
-                competencesParagraph.InsertAfterSelf p |> ignore
+                sectionHeader.InsertBeforeSelf p |> ignore
             else
                 printfn "'Методические материалы для оценки обучающимися содержания и качества учебного процесса' не удалось найти, список проверяемых ФОС компетенций не сгенерирован!"
         else
@@ -247,6 +247,8 @@ let patchProgram (curriculumFile: string) (programFileName: string) =
         fixStudent content body
 
         wordDocument.Save()
+
+        printfn "\n"
     with
     | :? OpenXmlPackageException
     | :? InvalidDataException ->
