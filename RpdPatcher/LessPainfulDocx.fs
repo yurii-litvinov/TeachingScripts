@@ -100,7 +100,10 @@ let createNumbering (document: WordprocessingDocument) =
 
     abstractNum.AppendChild lvl0 |> ignore
 
-    numberingPart.Descendants<AbstractNum>() |> Seq.last |> (fun n -> n.InsertAfterSelf abstractNum |> ignore)
+    if numberingPart.Descendants<AbstractNum>() |> Seq.isEmpty then
+        numberingPart.AppendChild abstractNum |> ignore
+    else
+        numberingPart.Descendants<AbstractNum>() |> Seq.last |> (fun n -> n.InsertAfterSelf abstractNum |> ignore)
 
     let num = NumberingInstance()
     let lastNumberingId = 

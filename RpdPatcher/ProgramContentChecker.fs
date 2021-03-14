@@ -233,7 +233,8 @@ let softRequirementsShallBeStandard (content: ProgramContent) =
 let libraryLinksShallPresent (content: ProgramContent) =
     if content.ContainsKey "3.4.3. Перечень иных информационных источников" then
         let otherSources = content.["3.4.3. Перечень иных информационных источников"].Trim()
-        if not (otherSources.Contains "Сайт Научной библиотеки им. М. Горького СПбГУ: http://www.library.spbu.ru/"
+        if not (otherSources.Contains "Сайт Научной библиотеки им. М. Горького СПбГУ:" 
+            && otherSources.Contains "http://www.library.spbu.ru/"
             && otherSources.Contains "Электронный каталог Научной библиотеки им. М. Горького СПбГУ"
             && otherSources.Contains "http://www.library.spbu.ru/cgi-bin/irbis64r/cgiirbis_64.exe?C21COM=F&I21DBN=IBIS&P21DBN=IBIS"
             && otherSources.Contains "Перечень электронных ресурсов, находящихся в доступе СПбГУ:"
