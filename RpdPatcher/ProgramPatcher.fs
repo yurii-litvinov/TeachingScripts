@@ -291,7 +291,7 @@ let addCompetencesToAttestationMaterials (content: ProgramContent) (curriculum: 
             else 
                 competences 
                 |> Seq.fold (fun (lastParagraph: Paragraph) competence -> 
-                        let description = $"{competence.Description.[0]}".ToLower() + competence.Description.Substring(1)
+                        let description = $"{competence.Description.[0]}".ToLower() + competence.Description.Substring(1).TrimEnd('.')
                         let p = createParagraph ($"{competence.Code} — {description}.") Stretch false false true
                         lastParagraph.InsertAfterSelf p
                     ) insertAfter
@@ -390,6 +390,7 @@ let addLiterature (document: WordprocessingDocument) (body: Body) =
             let nameParagraph = createParagraph name Left false false false
             let numPr = createNumberingPr numberingId
             nameParagraph.ParagraphProperties.AppendChild numPr |> ignore
+            nameParagraph.ParagraphProperties.SpacingBetweenLines <- SpacingBetweenLines(After = StringValue("0"))
             sectionHeader.InsertAfterSelf nameParagraph |> ignore
             let linkParagraph = createHyperlink link document
             nameParagraph.InsertAfterSelf linkParagraph |> ignore
