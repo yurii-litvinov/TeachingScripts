@@ -100,7 +100,7 @@ let createNumbering (document: WordprocessingDocument) =
 
     abstractNum.AppendChild lvl0 |> ignore
 
-    numberingPart.AppendChild abstractNum |> ignore
+    numberingPart.Descendants<AbstractNum>() |> Seq.last |> (fun n -> n.InsertAfterSelf abstractNum |> ignore)
 
     let num = NumberingInstance()
     let lastNumberingId = 
@@ -109,7 +109,7 @@ let createNumbering (document: WordprocessingDocument) =
         else
             numberingPart.Descendants<NumberingInstance>() 
             |> Seq.map (fun n -> n.NumberID.Value) 
-            |> Seq.sortDescending 
+            |> Seq.sortDescending
             |> Seq.head
 
     num.NumberID <- Int32Value(lastNumberingId + 1)
