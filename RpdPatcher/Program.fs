@@ -5,6 +5,7 @@ open System.Text.RegularExpressions
 open LessPainfulGoogleSheets
 open ProgramContentChecker
 open ProgramPatcher
+open System
 
 let plansFolder = "WorkingPlans"
 
@@ -24,7 +25,7 @@ let planNameToCode fileName =
     FileInfo(fileName).Name.Substring(3, "9999-2084".Length)
 
 let planCodeToFileName planCode =
-    Directory.EnumerateFiles plansFolder
+    Directory.EnumerateFiles (AppDomain.CurrentDomain.BaseDirectory + "/../../../" + plansFolder)
     |> Seq.find (fun f -> planNameToCode f = planCode)
 
 let isKnownPlanCode planCode =
@@ -68,6 +69,23 @@ let inventorize planCode programsFolder =
             |> Seq.sort 
             |> Seq.iter (printfn "%s")
 
+    let printDuplicates () =
+        let duplicates =
+            programs 
+            |> Seq.map (fun p -> (p, getCode p))
+            |> Seq.groupBy (fun (_, code) -> code)
+            |> Seq.filter (fun (_, s) -> s |> Seq.length > 1)
+            |> Seq.map (fun (_, s) -> s)
+            |> Seq.concat
+            |> Seq.map fst
+
+        if duplicates |> Seq.isEmpty |> not then
+            printfn ""
+            printfn "Дублирующиеся РПД:"
+            duplicates
+            |> Seq.sort 
+            |> Seq.iter (printfn "%s")
+
     let printIncorrectlyNamedPrograms () =
         let incorrectlyNamedPrograms =
             programs
@@ -83,6 +101,7 @@ let inventorize planCode programsFolder =
 
     printMissingDisciplines ()
     printUnneededPrograms ()
+    printDuplicates ()
     printIncorrectlyNamedPrograms ()
 
 let loadDisciplineOwners planCode =
@@ -112,7 +131,7 @@ let autoRename planCode programsFolder =
         (fun p ->
             let code = p.Name.Substring(0, 6)
             let discipline = findDiscipline code
-            let name = discipline.RussianName
+            let name = discipline.RussianName.Replace(":", "")
             let year = curriculum.CurriculumCode.Substring(0, 2)
             let curriculumCode = curriculum.CurriculumCode.Substring(3, 4)
             let semesters = discipline.Implementations |> Seq.map (fun i -> i.Semester) |> Seq.sort

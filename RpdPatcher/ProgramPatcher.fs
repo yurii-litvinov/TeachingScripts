@@ -56,6 +56,35 @@ let findParagraph (body: Body) (text: string) =
     let paragraphs = body.Descendants<Paragraph>()
     paragraphs |> Seq.tryFind (fun p -> p.InnerText.Contains(text))
 
+let findPreviousParagraph (body: Body) (paragraph: Paragraph) =
+    body.Descendants<Paragraph>() 
+    |> Seq.pairwise 
+    |> Seq.find (fun (_, next) -> next = paragraph) 
+    |> fst
+
+let findNextParagraph (body: Body) (paragraph: Paragraph) =
+    body.Descendants<Paragraph>() 
+    |> Seq.pairwise 
+    |> Seq.find (fun (prev, _) -> prev = paragraph) 
+    |> snd
+
+let rec removeNextParagraphIfEmpty (body: Body) (paragraph: Paragraph) (recursive: bool) =
+    let nextParagraph = findNextParagraph body paragraph
+
+    if nextParagraph.InnerText = "" then
+        nextParagraph.Remove()
+        if recursive then
+            removeNextParagraphIfEmpty body paragraph recursive
+
+let rec removePreviousParagraphIfEmpty (body: Body) (paragraph: Paragraph) (recursive: bool) =
+    let previousParagraph = findPreviousParagraph body paragraph
+
+    if previousParagraph.InnerText = "" then
+        previousParagraph.Remove()
+        if recursive then
+            removePreviousParagraphIfEmpty body paragraph recursive
+
+
 let patchSection (body: Body) (sectionName: string) (replaceTo: string list) =
     let paragraphs = body.Descendants<Paragraph>()
 
@@ -78,7 +107,7 @@ let patchSection (body: Body) (sectionName: string) (replaceTo: string list) =
     else
         printfn "Секция '%s' не найдена, замена не произведена!" sectionName
 
-let addGovernmentIfNeeded (body: Body) =
+let addGovernment (body: Body) =
     let text = body.InnerText.TrimStart()
     if not (text.StartsWith "Правительство Российской Федерации") then
         printfn "Добавляю 'Правительство Российской Федерации' в начало"
@@ -91,6 +120,27 @@ let addGovernmentIfNeeded (body: Body) =
         props.AppendChild spacing |> ignore
         university.InsertBeforeSelf government |> ignore
 
+let addStPetersburg (errors: string list) (body: Body) =
+    if errors |> List.exists (fun s -> s.StartsWith "Не найден 'Санкт-Петербург'") then
+        let nextSectionHeader = findParagraph body "Раздел 1"
+        if nextSectionHeader.IsSome then
+            let nextSectionHeader = nextSectionHeader.Value
+            removePreviousParagraphIfEmpty body nextSectionHeader false
+            printfn "Добавляю 'Санкт-Петербург 2020' примерно в титульник"
+            let stPetersburg = createParagraph "Санкт-Петербург" Center false false
+            nextSectionHeader.InsertBeforeSelf stPetersburg |> ignore
+            let year = createParagraph "2020" Center false false
+            nextSectionHeader.InsertBeforeSelf year |> ignore
+
+            let breakElement = Break(Type = EnumValue<BreakValues>(BreakValues.Page))
+            let breakRun = Run()
+            breakRun.AppendChild breakElement |> ignore
+            let pageBreak = Paragraph()
+            pageBreak.AppendChild breakRun |> ignore
+            nextSectionHeader.InsertBeforeSelf pageBreak |> ignore
+        else
+            printfn "Раздел 1 не найден, не могу добавить 'Санкт-Петербург'"
+
 let fixTextInRun (body: Body) (from: string) (replaceTo: string) =
     let texts = body.Descendants<Text>()
     let text = texts |> Seq.tryFind (fun r -> r.InnerText = from)
@@ -102,26 +152,16 @@ let fixTextEverywhere (body: Body) (from: string) (replaceTo: string) =
     body.Descendants<Text>()
     |> Seq.iter (fun t -> t.Text <- t.Text.Replace(from, replaceTo))
 
-let addLiterature (body: Body) =
-    let sectionHeader = findParagraph body "Перечень иных информационных источников"
-    if sectionHeader.IsSome then
-        let sectionHeader = sectionHeader.Value
-
-        let literature = 
-            [ "Сайт Научной библиотеки им. М. Горького СПбГУ: http://www.library.spbu.ru/"
-              "Электронный каталог Научной библиотеки им. М. Горького СПбГУ: http://www.library.spbu.ru/cgi-bin/irbis64r/cgiirbis_64.exe?C21COM=F&I21DBN=IBIS&P21DBN=IBIS" 
-              "Перечень электронных ресурсов, находящихся в доступе СПбГУ: http://cufts.library.spbu.ru/CRDB/SPBGU/" 
-              "Перечень ЭБС, на платформах которых представлены российские учебники, находящиеся в доступе СПбГУ: http://cufts.library.spbu.ru/CRDB/SPBGU/browse?name=rures&resource_type=8" ]
-            |> List.rev
-
-        printfn "Добавляю в перечень иных информационных источников стандартный список литературы (без форматирования!)" 
-
-        literature 
-        |> List.iter (fun s ->
-            let p = createParagraph s Stretch false false
-            sectionHeader.InsertAfterSelf p |> ignore)
-    else
-        printfn "'Перечень иных информационных источников' не найдел, литература не сгенерирована!" 
+let addCompetencesToLearningOutcomes (content: ProgramContent) (body: Body) =
+    if content |> shallContainCompetences |> List.isEmpty |> not then
+        let nextSectionHeader = findParagraph body "Перечень и объём активных и интерактивных форм учебных занятий"
+        if nextSectionHeader.IsSome then
+            printfn "Вставляю стандартную фразу про компетенции в раздел 1.3."
+            let p = createParagraph "Дисциплина участвует в формировании компетенций обучающихся по образовательной программе, установленных учебным планом для данной дисциплины." Stretch false false
+            removePreviousParagraphIfEmpty body nextSectionHeader.Value true
+            nextSectionHeader.Value.InsertBeforeSelf p |> ignore
+        else
+            printfn "Раздел 1.4 не найден, пропускаю добавление фразы про компетенции в раздел 1.3."
 
 let addCompetencesToAttestationMaterials (content: ProgramContent) (curriculum: Curriculum) (body: Body) (disciplineCode: string) =
     if content |> controlMaterialsShallReferenceCompetences |> List.isEmpty |> not then
@@ -173,12 +213,57 @@ let addCompetencesToAttestationMaterials (content: ProgramContent) (curriculum: 
                 let p = createParagraph competences Stretch false true
                 sectionHeader.InsertBeforeSelf p |> ignore
 
-                let p = createParagraph "Сформированность компетенций считается пропорционально доле успешных ответов на вопросы и выполненности заданий." Stretch false true
+                let p = createParagraph "Сформированность компетенций считается пропорционально доле успешных ответов на вопросы и доле выполненных заданий." Stretch false true
                 sectionHeader.InsertBeforeSelf p |> ignore
             else
                 printfn "'Методические материалы для оценки обучающимися содержания и качества учебного процесса' не удалось найти, список проверяемых ФОС компетенций не сгенерирован!"
         else
             printfn "'Методические материалы для проведения текущего контроля успеваемости и промежуточной аттестации' не удалось найти, компетенции в ФОС и шкалы оценивания не сгенерированы!"
+
+let fillRequiredLiterature (content: ProgramContent) (body: Body) =
+    if content.["3.4.1. Список обязательной литературы"].Trim() = "" then
+        let sectionHeader = findParagraph body "Список обязательной литературы"
+        if sectionHeader.IsSome then
+            let sectionHeader = sectionHeader.Value
+            printfn "Список обязательной литературы пуст, добавляю 'Не требуется'." 
+            removeNextParagraphIfEmpty body sectionHeader true
+            let p = createParagraph "Не требуется" Stretch false false
+            sectionHeader.InsertAfterSelf p |> ignore
+        else
+            printfn "'Список обязательной литературы' не найден!" 
+
+let fillOptionalLiterature (content: ProgramContent) (body: Body) =
+    if content.["3.4.2. Список дополнительной литературы"].Trim() = "" then
+        let sectionHeader = findParagraph body "Список дополнительной литературы"
+        if sectionHeader.IsSome then
+            let sectionHeader = sectionHeader.Value
+            removeNextParagraphIfEmpty body sectionHeader true
+            printfn "Список дополнительной литературы пуст, добавляю 'Не требуется'." 
+            let p = createParagraph "Не требуется" Stretch false false
+            sectionHeader.InsertAfterSelf p |> ignore
+        else
+            printfn "'Список дополнительной литературы' не найден!" 
+
+let addLiterature (body: Body) =
+    let sectionHeader = findParagraph body "Перечень иных информационных источников"
+    if sectionHeader.IsSome then
+        let sectionHeader = sectionHeader.Value
+
+        let literature = 
+            [ "Сайт Научной библиотеки им. М. Горького СПбГУ: http://www.library.spbu.ru/"
+              "Электронный каталог Научной библиотеки им. М. Горького СПбГУ: http://www.library.spbu.ru/cgi-bin/irbis64r/cgiirbis_64.exe?C21COM=F&I21DBN=IBIS&P21DBN=IBIS" 
+              "Перечень электронных ресурсов, находящихся в доступе СПбГУ: http://cufts.library.spbu.ru/CRDB/SPBGU/" 
+              "Перечень ЭБС, на платформах которых представлены российские учебники, находящиеся в доступе СПбГУ: http://cufts.library.spbu.ru/CRDB/SPBGU/browse?name=rures&resource_type=8" ]
+            |> List.rev
+
+        printfn "Добавляю в перечень иных информационных источников стандартный список литературы (без форматирования!)" 
+
+        literature 
+        |> List.iter (fun s ->
+            let p = createParagraph s Stretch false false
+            sectionHeader.InsertAfterSelf p |> ignore)
+    else
+        printfn "'Перечень иных информационных источников' не найден, литература не сгенерирована!" 
 
 let fixStudent (content: ProgramContent) (body: Body) =
     if content |> noStudent |> List.isEmpty |> not then
@@ -209,19 +294,28 @@ let fixStudent (content: ProgramContent) (body: Body) =
 let patchProgram (curriculumFile: string) (programFileName: string) =
     try
         use wordDocument = WordprocessingDocument.Open(programFileName, true)
-        let content, _ = parseProgram wordDocument
+        let content, errors = parseProgram wordDocument
         let curriculum = Curriculum curriculumFile
         let disciplineCode = FileInfo(programFileName).Name.Substring(0, 6)
         let body = wordDocument.MainDocumentPart.Document.Body
 
         printfn "Программа %s:\n" (FileInfo(programFileName).Name)
 
-        addGovernmentIfNeeded body
+        addGovernment body
+        
+        addStPetersburg errors body
 
         fixTextInRun 
             body
             "Требования подготовленности обучающегося к освоению содержания учебных занятий ("
             "Требования к подготовленности обучающегося к освоению содержания учебных занятий ("
+
+        fixTextInRun 
+            body
+            "Требования подготовленности обучающегося к освоению содержания учебных занятий (пререквизиты)"
+            "Требования к подготовленности обучающегося к освоению содержания учебных занятий (пререквизиты)"
+
+        addCompetencesToLearningOutcomes content body
 
         addCompetencesToAttestationMaterials content curriculum body disciplineCode
 
@@ -240,6 +334,9 @@ let patchProgram (curriculumFile: string) (programFileName: string) =
             "Характеристики аудиторного оборудования, в том числе неспециализированного компьютерного оборудования и программного обеспечения общего пользования"
             [ "Стандартное оборудование, используемое для обучения в СПбГУ."
               "MS Windows, MS Office, Mozilla FireFox, Google Chrome, Acrobat Reader DC, WinZip, Антивирус Касперского." ]
+
+        fillRequiredLiterature content body
+        fillOptionalLiterature content body
 
         if content |> libraryLinksShallPresent |> List.isEmpty |> not then
             addLiterature body

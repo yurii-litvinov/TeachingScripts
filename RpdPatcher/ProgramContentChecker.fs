@@ -66,7 +66,7 @@ let parse (steps: ParserStep list) inputString =
                 else
                     // Succeeded. Skipping input until next prefix.
                     let newInput = state.Input.Substring(recover)
-                    parseRec (n :: t) { state with Input = newInput; Errors = $"Не найден {h.Prefix}, вместо него '{state.Input.Substring(0, 30)}..." :: state.Errors }
+                    parseRec (n :: t) { state with Input = newInput; Errors = $"Не найден '{h.Prefix}', вместо него '{state.Input.Substring(0, 30)}...'" :: state.Errors }
         | h :: [] ->
             // Last step, parsed string is everything until end.
             if state.Input.StartsWith h.Prefix then
@@ -135,7 +135,7 @@ let parseProgramFile (programFileName: string) : (ProgramContent * string list) 
     with
     | :? OpenXmlPackageException
     | :? InvalidDataException ->
-        printfn "%s настолько коряв, что даже не читается, пропущен" programFileName
+        printfn "%s настолько коряв, что даже не читается, пропущен\n" programFileName
         (Map.empty, [])
 
 let checkEveryFieldFilled (content: ProgramContent) =
@@ -148,7 +148,7 @@ let checkEveryFieldFilled (content: ProgramContent) =
 let noStudent (content: ProgramContent) =
     content
     |> Map.toSeq
-    |> Seq.map (fun (k, v) -> if v.Contains "студен" then [ $"Секция '{k} содержит запрещённое слово 'студент'." ] else [])
+    |> Seq.map (fun (k, v) -> if v.Contains "студент" && not (k.StartsWith "3.4") then [ $"Секция '{k} содержит запрещённое слово 'студент'." ] else [])
     |> Seq.concat
     |> Seq.toList
 
@@ -247,6 +247,17 @@ let libraryLinksShallPresent (content: ProgramContent) =
     else
         []
 
+let libraryLinksShallNotContainNo (content: ProgramContent) =
+    if content.ContainsKey "3.4.3. Перечень иных информационных источников" then
+        let otherSources = content.["3.4.3. Перечень иных информационных источников"].Trim().ToLower()
+        let forbiddenStrings = ["нет."; "ресурсы сети интернет"; "не пред"; "не треб"; "требований нет"]
+        if forbiddenStrings |> List.exists (fun s -> otherSources.Contains s) then
+            [ "Раздел 3.4.3 содержит что-то, похожее на 'Не предусмотрено'." ]
+        else
+            []
+    else
+        []
+
 let checkProgram (programFileName: string) =
     let content, errors = parseProgramFile programFileName
 
@@ -260,7 +271,8 @@ let checkProgram (programFileName: string) =
           feedbackMethodShallBeStandard
           roomRequirementsShallBeStandard
           softRequirementsShallBeStandard 
-          libraryLinksShallPresent ] 
+          libraryLinksShallPresent
+          libraryLinksShallNotContainNo ] 
         |> List.map (fun f -> f content)
         |> List.concat
 
