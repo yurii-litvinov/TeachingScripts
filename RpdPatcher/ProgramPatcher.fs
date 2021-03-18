@@ -140,7 +140,8 @@ let addCompetencesToAttestationMaterials (content: ProgramContent) (curriculum: 
             printfn "'Методические материалы для проведения текущего контроля успеваемости и промежуточной аттестации' не удалось найти, компетенции в ФОС и шкалы оценивания не сгенерированы!"
 
 let fillRequiredLiterature (content: ProgramContent) (body: Body) =
-    if content.["3.4.1. Список обязательной литературы"].Trim() = "" then
+    if content.ContainsKey "3.4.1. Список обязательной литературы" 
+        && content.["3.4.1. Список обязательной литературы"].Trim() = "" then
         let sectionHeader = findParagraph body "Список обязательной литературы"
         if sectionHeader.IsSome then
             let sectionHeader = sectionHeader.Value
@@ -152,7 +153,8 @@ let fillRequiredLiterature (content: ProgramContent) (body: Body) =
             printfn "'Список обязательной литературы' не найден!" 
 
 let fillOptionalLiterature (content: ProgramContent) (body: Body) =
-    if content.["3.4.2. Список дополнительной литературы"].Trim() = "" then
+    if content.ContainsKey "3.4.2. Список дополнительной литературы"
+        && content.["3.4.2. Список дополнительной литературы"].Trim() = "" then
         let sectionHeader = findParagraph body "Список дополнительной литературы"
         if sectionHeader.IsSome then
             let sectionHeader = sectionHeader.Value

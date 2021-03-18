@@ -46,7 +46,7 @@ let inventorize planCode programsFolder =
             |> Seq.filter (fun d -> programs |> Seq.tryFind (fun s -> s.Contains(d.Code)) |> Option.isNone)
 
         if missingDisciplines |> Seq.isEmpty then
-            printfn "Всё в порядке."
+            printfn "Все нужные дисциплины присутствуют."
         else
             printfn "Отсутствующие рабочие программы:"
             missingDisciplines
@@ -86,6 +86,19 @@ let inventorize planCode programsFolder =
             |> Seq.sort 
             |> Seq.iter (printfn "%s")
 
+    let printProgramsInOldDocFormat () =
+        let programs =
+            programs
+            |> Seq.filter (not << excluded << getCode)
+            |> Seq.filter (fun p -> FileInfo(p).Extension = ".doc")
+
+        if programs |> Seq.isEmpty |> not then
+            printfn ""
+            printfn "РПД в старом бинарном формате .doc:"
+            programs
+            |> Seq.sort 
+            |> Seq.iter (printfn "%s")
+
     let printIncorrectlyNamedPrograms () =
         let incorrectlyNamedPrograms =
             programs
@@ -99,9 +112,11 @@ let inventorize planCode programsFolder =
             |> Seq.sort 
             |> Seq.iter (printfn "%s")
 
+
     printMissingDisciplines ()
     printUnneededPrograms ()
     printDuplicates ()
+    printProgramsInOldDocFormat ()
     printIncorrectlyNamedPrograms ()
 
 let loadDisciplineOwners planCode =
