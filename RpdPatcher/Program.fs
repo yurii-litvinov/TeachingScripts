@@ -7,7 +7,7 @@ open ProgramContentChecker
 open ProgramPatcher
 open System
 
-let plansFolder = "WorkingPlans"
+let plansFolder = "../WorkingPlans"
 
 let owners = Config.owners |> Map.ofList
 

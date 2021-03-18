@@ -20,7 +20,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="curriculum-parser\CurriculumParser\CurriculumParser.csproj" />
+    <ProjectReference Include="..\curriculum-parser\CurriculumParser\CurriculumParser.csproj" />
   </ItemGroup>
 
 </Project>
