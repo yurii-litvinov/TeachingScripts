@@ -117,7 +117,7 @@ let addCompetencesToAttestationMaterials (content: ProgramContent) (curriculum: 
                 |> addHeader "Компетенции, полностью сформированные по результатам освоения дисциплины:" 
                 |> addCompetences fullyFormedCompetences
         
-            let p = createParagraph "Для каждой компетенции применяется линейная шкала оценивания, определяемая долей успешно выполненных заданий, проверяющих данную компетенцию" Stretch false false true
+            let p = createParagraph "Для каждой компетенции применяется линейная шкала оценивания, определяемая долей успешно выполненных заданий, проверяющих данную компетенцию." Stretch false false true
             competencesParagraph.InsertAfterSelf p |> ignore
 
             let sectionHeader = findParagraph body "Методические материалы для оценки обучающимися содержания и качества учебного процесса"
@@ -226,6 +226,47 @@ let fixStudent (content: ProgramContent) (body: Body) =
         fixTextEverywhere body "Студенты" "Обучающиеся"
         fixTextEverywhere body "Студент" "Обучающийся"
 
+let fixDoubleSpaces (body: Body) =
+    let rec fixDoubleSpacesInText (text: string) (result: bool)=
+        let newText = text.Replace("  ", " ")
+        if newText = text then
+            (text, result)
+        else
+            fixDoubleSpacesInText newText true
+
+    body.Descendants<Text>()
+    |> Seq.toList
+    |> List.filter (fun t -> t.Text.Contains "Р А Б О Ч А Я" |> not)
+    |> List.map (fun t -> 
+        let text, wasReplaced = fixDoubleSpacesInText t.Text false
+        if wasReplaced then
+            t.Text <- text
+        wasReplaced)
+    |> List.contains true
+    |> (fun result -> if result then printfn "Избавляюсь от двойных пробелов.")
+
+let fixRunFonts (body: Body) =
+    body.Descendants<Run>()
+    |> Seq.toList
+    |> List.map (fun r -> 
+        let fonts = 
+            RunFonts
+                (Ascii = StringValue("Times New Roman"), 
+                    HighAnsi = StringValue("Times New Roman"), 
+                    ComplexScript = StringValue("Times New Roman"))
+
+        if r.RunProperties = null then
+            r.RunProperties <- RunProperties()
+
+        if r.RunProperties.RunFonts = null || r.RunProperties.FontSize = null then
+            r.RunProperties.RunFonts <- fonts
+            r.RunProperties.FontSize <- FontSize(Val = StringValue("24"))
+            true
+        else
+            false)
+    |> List.contains true
+    |> (fun result -> if result then printfn "Выставляю шрифт в Times New Roman.")
+
 let patchProgram (curriculumFile: string) (programFileName: string) =
     try
         use wordDocument = WordprocessingDocument.Open(programFileName, true)
@@ -237,7 +278,14 @@ let patchProgram (curriculumFile: string) (programFileName: string) =
         printfn "Программа %s:\n" (FileInfo(programFileName).Name)
 
         addGovernment body
+
+        fixDoubleSpaces body
         
+        fixTextInRun 
+            body
+            "Р А Б О Ч А Я П Р О Г Р А М "
+            "Р А Б О Ч А Я   П Р О Г Р А М "
+
         addStPetersburg errors body
 
         fixTextInRun 
@@ -278,7 +326,91 @@ let patchProgram (curriculumFile: string) (programFileName: string) =
 
         fixStudent content body
 
+        fixRunFonts body
+
         wordDocument.Save()
+
+        printfn "\n"
+    with
+    | :? OpenXmlPackageException
+    | :? InvalidDataException ->
+        printfn "%s настолько коряв, что даже не читается, пропущен" programFileName
+
+let patchYear (year: string) (programFileName: string) =
+    try
+        use wordDocument = WordprocessingDocument.Open(programFileName, true)
+        let texts = wordDocument.MainDocumentPart.Document.Body.Descendants<Text>()
+        let pair = texts |> Seq.pairwise |> Seq.tryFind (fun (r1, _) -> r1.Text = "Санкт-Петербург")
+        match pair with
+        | Some (_, yearText) -> 
+            if yearText.Text.Length = 4 then
+                printfn "Меняю год в '%s' на %s" programFileName year
+                yearText.Text <- year
+                wordDocument.Save()
+            elif yearText.Text.Length = 2 then
+                let nextRun = yearText.Parent.ElementsAfter() |> Seq.tryHead
+                if nextRun.IsSome && nextRun.Value.InnerText.Length = 2 then
+                    printfn "Меняю год в '%s' на %s" programFileName year
+                    nextRun.Value.Remove()
+                    yearText.Text <- year
+                    wordDocument.Save()
+                else
+                    printfn "Неверный формат титульника, год в '%s' не изменён!" programFileName 
+            else 
+                printfn "Неверный формат титульника, год в '%s' не изменён!" programFileName 
+        | _ -> 
+            printfn "Неверный формат титульника, год в '%s' не изменён!" programFileName 
+
+        printfn "\n"
+    with
+    | :? OpenXmlPackageException
+    | :? InvalidDataException ->
+        printfn "%s настолько коряв, что даже не читается, пропущен" programFileName
+
+let removeCompetences (programFileName: string) =
+    try
+        use wordDocument = WordprocessingDocument.Open(programFileName, true)
+        let paragraphs = wordDocument.MainDocumentPart.Document.Body.Descendants<Paragraph>()
+        let firstCompetenceParagraph = paragraphs |> Seq.tryFind (fun p -> p.InnerText = "Компетенции, впервые формируемые дисциплиной:")
+
+        match firstCompetenceParagraph with
+        | Some firstCompetenceParagraph ->
+            let lastCompetenceParagraph = 
+                paragraphs 
+                |> Seq.find (fun p -> 
+                    p.InnerText.StartsWith "Для каждой компетенции применяется линейная шкала оценивания, определяемая долей успешно выполненных заданий, проверяющих данную компетенцию")
+
+            let finishingParagraph = 
+                paragraphs 
+                |> Seq.find (fun p -> 
+                    p.InnerText.StartsWith "Проверяемые компетенции:")
+
+        
+            let next = finishingParagraph.ElementsAfter() |> Seq.head 
+            if next.InnerText.StartsWith "Сформированность компетенций считается пропорционально доле успешных ответов на вопросы и доле выполненных заданий" |> not then
+                printfn "Файл '%s' не преобразован, неправильная структура ФОС!" programFileName
+            else
+                printfn "Удаляю компетенции из '%s'." programFileName
+
+                finishingParagraph.Remove()
+                next.Remove()
+
+                let paragraphs =  firstCompetenceParagraph.ElementsAfter () |> Seq.filter (fun e -> e :? Paragraph) |> Seq.cast<Paragraph> |> Seq.toList
+                firstCompetenceParagraph.Remove()
+
+                let rec removeParagraph paragraphs =
+                    match paragraphs with
+                    | h :: _ when h = lastCompetenceParagraph ->
+                        h.Remove ()
+                    | h :: t -> 
+                        h.Remove ()
+                        removeParagraph t
+                    | _ -> ()
+            
+                removeParagraph paragraphs
+
+            wordDocument.Save()
+        | None -> printfn "Файл '%s' не преобразован, там и так нет компетенций (или не могу найти)." programFileName
 
         printfn "\n"
     with

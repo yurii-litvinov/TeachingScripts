@@ -259,6 +259,16 @@ let libraryLinksShallNotContainNo (content: ProgramContent) =
     else
         []
 
+let shouldNotContainForbiddenStrings (content: ProgramContent) =
+    content
+    |> Map.toSeq
+    |> Seq.map (fun (k, v) -> 
+        Config.forbiddenStrings 
+        |> Seq.map (fun s -> if v.ToLower().Contains (s.ToLower()) then [ $"Секция '{k}' содержит запрещённое слово '{s}'." ] else [])
+        |> Seq.concat)
+    |> Seq.concat
+    |> Seq.toList
+
 let checkProgram (programFileName: string) =
     let content, errors = parseProgramFile programFileName
 
@@ -273,7 +283,8 @@ let checkProgram (programFileName: string) =
           roomRequirementsShallBeStandard
           softRequirementsShallBeStandard 
           libraryLinksShallPresent
-          libraryLinksShallNotContainNo ] 
+          libraryLinksShallNotContainNo 
+          shouldNotContainForbiddenStrings ]
         |> List.map (fun f -> f content)
         |> List.concat
 
@@ -287,7 +298,6 @@ let checkProgram (programFileName: string) =
             printfn "\tОшибки проверки:"
             for error in checkingResults do
                 printfn "\t\t%s" error
-
 
         printfn ""
         printfn ""

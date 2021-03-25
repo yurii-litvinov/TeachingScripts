@@ -128,41 +128,45 @@ let loadDisciplineOwners planCode =
     |> Seq.map (fun (name, owner) -> (name.Substring(1, 6), owner.Split [|' '|] |> Array.item 0))
     |> Map.ofSeq
 
-let autoRename planCode programsFolder =
+let autoRename planCode programsFolder force =
     let curriculum = DocxCurriculum(planCodeToFileName planCode)
     let disciplines = curriculum.Disciplines
     let owners = loadDisciplineOwners planCode
 
-    let findDiscipline code = disciplines |> Seq.find (fun d -> d.Code = code)
+    let findDiscipline code = disciplines |> Seq.tryFind (fun d -> d.Code = code)
 
     let programs = 
         Directory.EnumerateFiles programsFolder
         |> Seq.map FileInfo
 
     programs
-    |> Seq.filter (fun p -> isProgramNameOk p.Name |> not)
+    |> Seq.filter (fun p -> isProgramNameOk p.Name |> not || force = "-f")
     |> Seq.filter (fun p -> excluded (getCode p.Name) |> not)
     |> Seq.iter 
         (fun p ->
             let code = p.Name.Substring(0, 6)
             let discipline = findDiscipline code
-            let name = discipline.RussianName.Replace(":", "")
-            let year = curriculum.CurriculumCode.Substring(0, 2)
-            let curriculumCode = curriculum.CurriculumCode.Substring(3, 4)
-            let semesters = discipline.Implementations |> Seq.map (fun i -> i.Semester) |> Seq.sort
-            let startSemester = semesters |> Seq.head
-            let endSemester = semesters |> Seq.last
-            let semesterPart = if startSemester = endSemester then string startSemester else $"{startSemester}-{endSemester}"
-            let owner = if owners.ContainsKey code then owners.[code] else ""
+            if discipline.IsSome then
+                let discipline = discipline.Value
+                let name = discipline.RussianName.Replace(":", "")
+                let year = curriculum.CurriculumCode.Substring(0, 2)
+                let curriculumCode = curriculum.CurriculumCode.Substring(3, 4)
+                let semesters = discipline.Implementations |> Seq.map (fun i -> i.Semester) |> Seq.sort
+                let startSemester = semesters |> Seq.head
+                let endSemester = semesters |> Seq.last
+                let semesterPart = if startSemester = endSemester then string startSemester else $"{startSemester}-{endSemester}"
+                let owner = if owners.ContainsKey code then owners.[code] else ""
 
-            if p.Extension <> ".docx" then
-                printfn "Файл '%s' не будет переименован, он не .docx!" p.Name
-            elif owner = "" then
-                printfn "Файл '%s' не будет переименован, неизвестен 'хозяин' дисциплины (см. соответствующую таблицу в Google Docs)!" p.Name
+                if p.Extension <> ".docx" then
+                    printfn "Файл '%s' не будет переименован, он не .docx!" p.Name
+                elif owner = "" then
+                    printfn "Файл '%s' не будет переименован, неизвестен 'хозяин' дисциплины (см. соответствующую таблицу в Google Docs)!" p.Name
+                else
+                    let newName = $"{code}_{name}_{year}_{curriculumCode}_{semesterPart}с_{owner}.docx"
+                    p.MoveTo($"{p.DirectoryName}/{newName}")
+                    printfn "Файл '%s' переименован в  '%s'" p.Name newName
             else
-                let newName = $"{code}_{name}_{year}_{curriculumCode}_{semesterPart}с_{owner}.docx"
-                p.MoveTo($"{p.DirectoryName}/{newName}")
-                printfn "Файл '%s' переименован в  '%s'" p.Name newName
+                printfn "Файл '%s' не соответствует ни одной дисциплине из учебного плана" p.Name
         )
 
 let deleteExcluded programsFolder =
@@ -187,6 +191,75 @@ let patchPrograms planCode programsFolder =
 
 let patchProgram planCode programFileName =
     ProgramPatcher.patchProgram (planCodeToFileName planCode) programFileName
+
+let patchYear year programFileName =
+    ProgramPatcher.patchYear year programFileName
+
+let patchYears year programsFolder =
+    Directory.EnumerateFiles programsFolder
+    |> Seq.map FileInfo
+    |> Seq.filter (fun p -> excluded (getCode p.Name) |> not)
+    |> Seq.iter (fun p -> patchYear year p.FullName)
+
+let removeCompetences programFileName =
+    ProgramPatcher.removeCompetences programFileName
+
+let removeCompetencesInFolder programsFolder =
+    Directory.EnumerateFiles programsFolder
+    |> Seq.map FileInfo
+    |> Seq.filter (fun p -> excluded (getCode p.Name) |> not)
+    |> Seq.iter (fun p -> removeCompetences p.FullName)
+
+let comparePlans oldPlan newPlan =
+    let oldCurriculum = DocxCurriculum(planCodeToFileName oldPlan)
+    let newCurriculum = DocxCurriculum(planCodeToFileName newPlan)
+
+    let oldPlanDisciplines = oldCurriculum.Disciplines 
+    let newPlanDisciplines = newCurriculum.Disciplines 
+
+    let sharedDisciplines = oldPlanDisciplines |> Seq.filter (fun d -> newPlanDisciplines |> Seq.exists (fun nd -> d.Code = nd.Code))
+
+    let str (discipline: Discipline) = sprintf "[%s] '%s'" discipline.Code discipline.RussianName
+
+    printfn "Дисциплины плана %s, которых нет в %s:" oldPlan newPlan
+    oldPlanDisciplines |> Seq.filter (fun d -> sharedDisciplines |> Seq.contains d |> not) |> Seq.iter (printfn "%s" << str)
+    printfn ""
+
+    printfn "Дисциплины плана %s, которых нет в %s:" newPlan oldPlan
+    newPlanDisciplines |> Seq.filter (fun d -> sharedDisciplines |> Seq.exists (fun sd -> sd.Code = d.Code) |> not) |> Seq.iter (printfn "%s" << str)
+    printfn ""
+
+    let matchingPairs = sharedDisciplines |> Seq.map (fun d -> (d, newPlanDisciplines |> Seq.find (fun nd -> d.Code = nd.Code)))
+
+    let laborIntensity (discipline: Discipline) = discipline.Implementations |> Seq.sumBy (fun i -> i.LaborIntensity)
+    let attestationTypes (discipline: Discipline) = discipline.Implementations |> Seq.map (fun i -> i.MonitoringTypes) |> Seq.toList
+    let semesters (discipline: Discipline) = discipline.Implementations |> Seq.map (fun i -> i.Semester) |> Seq.toList
+    let hours (discipline: Discipline) = discipline.Implementations |> Seq.map (fun i -> i.WorkHours) |> Seq.toList
+
+    printfn ""
+    printfn "Разница в трудоёмкости:"
+    matchingPairs 
+    |> Seq.filter (fun (o, n) -> (laborIntensity o) <> (laborIntensity n))
+    |> Seq.iter (fun (o, n) -> printfn "%s: трудоёмкость в %s: %d, в %s: %d" (str o) oldPlan (laborIntensity o) newPlan (laborIntensity n))
+
+    printfn ""
+    printfn "Разница в семестрах реализации:"
+    matchingPairs 
+    |> Seq.filter (fun (o, n) -> (semesters o) <> (semesters n))
+    |> Seq.iter (fun (o, n) -> printfn "%s: семестры в %s: %A, в %s: %A" (str o) oldPlan (semesters o) newPlan (semesters n))
+
+    printfn ""
+    printfn "Разница в форме аттестации:"
+    matchingPairs 
+    |> Seq.filter (fun (o, n) -> (attestationTypes o) <> (attestationTypes n))
+    |> Seq.iter (fun (o, n) -> printfn "%s: формы аттестации в %s: %A, в %s: %A" (str o) oldPlan (attestationTypes o) newPlan (attestationTypes n))
+
+    printfn ""
+    printfn "Разница в часах:"
+    matchingPairs 
+    |> Seq.filter (fun (o, n) -> (hours o) <> (hours n))
+    |> Seq.iter (fun (o, n) -> printfn "%s: часы в %s: %A, в %s: %A" (str o) oldPlan (hours o) newPlan (hours n))
+
 
 let printHelp () =
     printfn "Добро пожаловать в RPD Patcher, утилиту для проверки и автоматических исправлений РПД СПбГУ."
@@ -222,13 +295,27 @@ let main argv =
             else
                 f argv.[1] argv.[2]
 
+        let call3 f =
+            if argv.Length < 3 then
+                printHelp ()
+            elif argv.Length = 3 then 
+                f argv.[1] argv.[2] ""
+            elif argv.Length = 4 then
+                f argv.[1] argv.[2] argv.[3]
+
+        
         match argv.[0] with
         | "--inventorize" | "-i" -> call inventorize 
-        | "--auto-rename" | "-r" -> call autoRename
+        | "--auto-rename" | "-r" -> call3 autoRename
         | "--delete-excluded" -> deleteExcluded argv.[1]
         | "--check-content" | "-c" -> checkContent argv.[1]
         | "--check-program" | "-cp" -> checkProgram argv.[1]
         | "--patch" | "-p" -> call patchPrograms
         | "--patch-program" | "-pp" -> call patchProgram
+        | "--patch-year" -> call patchYear
+        | "--patch-years" -> call patchYears
+        | "--remove-competences" -> removeCompetences argv.[1]
+        | "--remove-competences-all" -> removeCompetencesInFolder argv.[1]
+        | "--compare-plans" -> call comparePlans
         | _ -> printHelp ()
     0
