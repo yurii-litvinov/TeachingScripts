@@ -2,6 +2,7 @@
 open DocumentFormat.OpenXml.Packaging
 open DocumentFormat.OpenXml
 open DocumentFormat.OpenXml.Wordprocessing
+open System.IO
 
 let fillSeq size seq =
     let length = Seq.length seq
@@ -198,7 +199,53 @@ let generateScheduleDoc (schedule: Day list) =
 
     schedule |> List.iter generateDay
 
-    ()
+let generateMails (schedule: Day list) =
+    let generateMail (writer: StreamWriter) (commissionMember: CommissionMember, list: (string * Program list) list) =
+        let program = function
+            | PIBachelors -> "бакалавров программной инженерии"
+            | MOBachelors -> "бакалавров математического обеспечения"
+            | PIMasters -> "магистров программной инженерии"
+            | MOMasters -> "магистров математического обеспечения"
+            | Aspirants -> "аспирантов"
+
+        let programs (p: Program list) =
+            p |> List.fold (fun acc cur -> (if acc <> "" then acc + ", " else "") + (program cur)) ""
+
+        writer.WriteLine $"to: {commissionMember.Mail}"
+        writer.WriteLine $""
+        let splitName = commissionMember.Name.Split(" ")
+        writer.WriteLine $"Здравствуйте, {splitName.[1]} {splitName.[2]}!"
+        writer.WriteLine $""
+
+        if list.Length = 1 then
+            writer.WriteLine $"Расписание защит готово, хотим Вас занять на один день, {fst list.Head}, на защиты {programs (snd list.Head)}"
+        else
+            writer.WriteLine $"Расписание защит готово, хотим Вас занять на следующие дни:"
+            list |> List.iter (fun day -> writer.WriteLine $"- {fst day}, на защиты {programs (snd day)}")
+
+        writer.WriteLine $""
+        writer.WriteLine $"Если никаких изменений не будет, где-то за неделю до защит я разошлю тексты дипломов для предварительного ознакомления."
+        writer.WriteLine $""
+        writer.WriteLine $"С уважением,"
+        writer.WriteLine $"Юрий Литвинов."
+        writer.WriteLine $""
+        writer.WriteLine $""
+
+    let commissionMembers = 
+        schedule
+        |> List.map (fun day -> (day.Date, day.Sittings |> List.map (fun s -> s.Program), day.Chair :: day.Commission))
+        |> List.map (fun (date, sittings, commission) -> commission |> List.map (fun m -> (m, date, sittings)))
+        |> List.concat
+        |> List.groupBy (fun (m, _, _) -> m)
+        |> List.map (fun (k, v) -> (k, v |> List.map (fun (_, d, s) -> (d, s))))
+        |> List.map (fun (k, v) -> (k, v |> List.groupBy (fun (date, _) -> date)))
+        |> List.map (fun (k, v) -> 
+            (k, v |> List.map (fun (date, list) -> 
+                (date, list |> List.map (fun (_, list) -> list) |> List.concat |> List.distinct))))
+
+    use file = File.Open("mails.txt", FileMode.Create)
+    use writer = new StreamWriter(file)
+    commissionMembers |> List.iter (generateMail writer)
 
 [<EntryPoint>]
 let main _ =
@@ -207,5 +254,7 @@ let main _ =
     let schedule = addMemberInfo service schedule
 
     generateScheduleDoc schedule
+
+    generateMails schedule
 
     0
