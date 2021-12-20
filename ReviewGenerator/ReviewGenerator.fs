@@ -53,7 +53,7 @@ let main argv =
 
     works 
     |> Seq.iter(fun work ->
-        use file = new FileStream(work.name.Replace('\"', ' ') + ".txt", FileMode.Create)
+        use file = new FileStream(work.name.Replace('\"', ' ').Replace('/', '-').Replace('\\', '-') + ".txt", FileMode.Create)
         use writer = new StreamWriter(file)
         writer.WriteLine("Здравствуйте.")
         writer.WriteLine()
@@ -95,8 +95,9 @@ let main argv =
         if work.general <> "" then
             writer.WriteLine("Общий комментарий к работе:")
             writer.WriteLine(work.general)
+            writer.WriteLine()
 
-        writer.WriteLine("Доработанный текст надо выложить в MS Teams и написать мне, что работа готова к повторному рецензированию")
+        writer.WriteLine("В общем, надо поправить, выложить в папку и сообщить мне, что работа готова к повторному рецензированию")
 
         ()
         )
