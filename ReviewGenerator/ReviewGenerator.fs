@@ -56,8 +56,9 @@ let main argv =
                     )
 
     works 
-    |> Seq.iter(fun work ->
-        use file = new FileStream(work.name.Replace('\"', ' ').Replace('/', '-').Replace('\\', '-').Replace(':', ' ') + ".txt", FileMode.Create)
+    |> Seq.iteri(fun i work ->
+        let fileName = work.name.Replace('\"', ' ').Replace('/', '-').Replace('\\', '-').Replace(':', ' ')
+        use file = new FileStream($"{i + (int offset)}.{fileName}.txt", FileMode.Create)
         use writer = new StreamWriter(file)
 
         let writeSection (title: string) (score: string) (comment: string) =
