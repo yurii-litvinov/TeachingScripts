@@ -57,7 +57,7 @@ let main argv =
 
     works 
     |> Seq.iter(fun work ->
-        use file = new FileStream(work.name.Replace('\"', ' ').Replace('/', '-').Replace('\\', '-') + ".txt", FileMode.Create)
+        use file = new FileStream(work.name.Replace('\"', ' ').Replace('/', '-').Replace('\\', '-').Replace(':', ' ') + ".txt", FileMode.Create)
         use writer = new StreamWriter(file)
 
         let writeSection (title: string) (score: string) (comment: string) =

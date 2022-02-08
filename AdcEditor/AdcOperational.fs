@@ -396,14 +396,17 @@ let autoAddRooms rooms =
     logIn ()
     let curriculum = Curriculum(Config.curriculumFileName)
 
-    switchFilter InProgress
+    //switchFilter InProgress
 
     let disciplineName = getDisciplineNameFromTable 1
     let semester = getSemesterFromTable 1
 
     openRecord 1
     
-    addRooms (makeRoomsMap (curriculum.GetWorkTypes disciplineName semester) rooms)
+    if disciplineName = "Адаптация и обучение в Университете (ЭО)" then
+        addRooms (makeRoomsMap ["Промежуточная аттестация (зач)", 2] rooms)
+    else
+        addRooms (makeRoomsMap (curriculum.GetWorkTypes disciplineName semester) rooms)
 
 let autoAddSoftware software =
     logIn ()
@@ -457,6 +460,203 @@ let autoCorrectRoomsForAll filter offset =
             wipeOutRooms ()
             addRooms (extendRoomMap rooms workTypes)
             backToTable ()
+
+(*
+let autoAddRoomsForAll () =
+    let roomInfo = RoomData(Config.roomDataSheetId)
+    let curriculum = Curriculum(Config.curriculumFileName)
+
+    logIn ()
+
+    let disciplines = tableSize ()
+    for row in [1..disciplines] do
+        let disciplineName = getDisciplineNameFromTable row
+        let semester = getSemesterFromTable row
+
+        if notImplementedCourses.[Config.programStartYear].Contains (disciplineName, semester) |> not then
+            match disciplineName with 
+            | "Английский язык" 
+            | "Английский язык по специальности" ->
+                openRecord row
+                Thread.Sleep 1000
+                let trajectoryFullName = getRecordCaption ()
+                if trajectoryFullName.Contains("Английский язык по специальности") then
+                    addRooms (extendRoomMap englishForSpecialPurposesWorkTypes.[semester] englishForSpecialPurposesRooms.[semester])
+                else
+                    let regexMatch = Regex.Match(trajectoryFullName, @".*(Траектория \d).*")
+                    let trajectory = if regexMatch.Success then regexMatch.Groups.[1].Value else ""
+                    match trajectory with 
+                    | "Траектория 1" -> 
+                        // Trajectory 1 was never implemented, so there is no teacher pool or rooms for it.
+                        wipeOutTeachers ()
+                        wipeOutRooms ()
+                        markAsDone ()
+                    | "Траектория 2"
+                    | "Траектория 3"
+                    | "Траектория 4" ->
+                        processTypicalRecord 
+                            teachers
+                            (englishWorkTypes trajectory semester)
+                            (englishRooms trajectory semester)
+                            semester
+                    | _ -> failwith "Unknown trajectory!"
+
+            | "Немецкий язык" ->
+                processTypicalRecord 
+                    germanTeachers.[semester]
+                    germanWorkTypes.[semester]
+                    (makeRoomsMap germanWorkTypes.[semester] germanRooms.[semester])
+                    semester
+            | "Испанский язык" ->
+                processTypicalRecord 
+                    spanishTeachers.[semester]
+                    spanishWorkTypes.[semester]
+                    (makeRoomsMap spanishWorkTypes.[semester] spanishRooms.[semester])
+                    semester
+            | "Французский язык" ->
+                processTypicalRecord 
+                    frenchTeachers.[semester]
+                    frenchWorkTypes.[semester]
+                    (makeRoomsMap frenchWorkTypes.[semester] frenchRooms.[semester])
+                    semester
+            | "Английский язык в сфере профессиональной коммуникации" ->
+                let rooms = roomInfo.Rooms semester disciplineName
+                processTypicalRecord 
+                    mastersEnglishTeachers.[semester]
+                    mastersEnglishWorkTypes.[semester]
+                    (extendRoomMap rooms (curriculum.GetWorkTypes disciplineName semester))
+                    semester
+            | "Немецкий язык в сфере профессиональной коммуникации" ->
+                ()  // Do nothing. Was not implemented this year.
+            | "Учебная практика 1 (научно-исследовательская работа)" 
+            | "Учебная практика 1" 
+            | "Учебная практика 2 (научно-исследовательская работа)" 
+            | "Учебная практика 2" 
+            | "Производственная практика (проектно-технологическая)"
+            | "Производственная практика (научно-исследовательская работа)"
+            | "Производственная практика" ->
+                processTypicalRecord 
+                    ["Литвинов Юрий Викторович"; "Литвинов Юрий Викторович"; "Литвинов Юрий Викторович"; "Литвинов Юрий Викторович"]
+                    practiceWorkTypes
+                    (makeRoomsMap practiceWorkTypes computerClasses)
+                    semester
+            | "Курсовая работа 1" 
+            | "Курсовая работа 2" 
+            | "Курсовая работа 3" ->
+                processTypicalRecord 
+                    courseWorkTeachers
+                    courseWorkWorkTypes
+                    (makeRoomsMap courseWorkWorkTypes computerClasses)
+                    semester
+            | "Подготовка выпускной квалификационной работы"  ->
+                processTypicalRecord 
+                    courseWorkTeachers
+                    vkrWorkTypes
+                    (makeRoomsMap vkrWorkTypes computerClasses)
+                    semester
+            | "Производственная практика (преддипломная)"
+            | "Преддипломная практика" ->
+                doPreGraduationMagic semester
+            | "Учебная практика (научно-исследовательская работа)"
+            | "Научно-исследовательская (производственная) практика" ->
+                processTypicalRecord 
+                    ["Абрамов Максим Викторович"; "Ловягин Юрий Никитич"]
+                    mastersPracticeWorkTypes
+                    (makeRoomsMap mastersPracticeWorkTypes computerClasses)
+                    semester
+            | "Научно-производственная практика" ->
+                processTypicalRecord 
+                    ["Луцив Дмитрий Вадимович"; "Ловягин Юрий Никитич"]
+                    mastersPracticeWorkTypes
+                    (makeRoomsMap mastersPracticeWorkTypes computerClasses)
+                    semester
+            | "Педагогическая практика" ->
+                processTypicalRecord 
+                    ["Ловягин Юрий Никитич"; "Тулупьева Татьяна Валентиновна"]
+                    mastersPedagogicalPracticeWorkTypes
+                    (makeRoomsMap mastersPedagogicalPracticeWorkTypes ["4511"])
+                    semester
+            | "Физическая культура и спорт" ->
+                let trajectoryFullName = getRecordCaption ()
+                let trajectory = if trajectoryFullName.Contains "Спортивный" then "Спортивный" else "Основной"
+                processTypicalRecord 
+                    (physicalTrainingTeacher ())
+                    (physicalTrainingWorkTypes semester trajectory)
+                    (makeRoomsMap (physicalTrainingWorkTypes semester trajectory) physicalTrainingRooms)
+                    semester
+            | "Русский язык как иностранный" ->
+                doRussianMagic semester
+            | "Администрирование информационных систем (на английском языке)" ->
+                processTypicalRecord
+                    additionalTeachers.[semester].[disciplineName]
+                    ["Лекции", 24; "Промежуточная аттестация (зач)", 2]
+                    (extendRoomMap (roomInfo.Rooms semester disciplineName) ["Лекции", 24; "Промежуточная аттестация (зач)", 2])
+                    semester
+            | _ ->
+                if onlineCourses.ContainsKey disciplineName then
+                    if disciplineName = "Безопасность жизнедеятельности (онлайн-курс)" then
+                        processTypicalRecord 
+                            onlineCourses.[disciplineName]
+                            onlineSafetyWorkTypes
+                            (makeRoomsMap onlineSafetyWorkTypes computerClasses)
+                            semester
+                    else
+                        processTypicalRecord 
+                            onlineCourses.[disciplineName]
+                            (onlineWorkTypes ())
+                            (makeRoomsMap (onlineWorkTypes ()) computerClasses)
+                            semester
+                elif facultatives.ContainsKey disciplineName then
+                    processTypicalRecord 
+                        facultatives.[disciplineName]
+                        facultativeWorkTypes.[disciplineName]
+                        (makeRoomsMap facultativeWorkTypes.[disciplineName] computerClasses)
+                        semester
+                else
+                    let teachers = 
+                        if commonUniversityCourses.ContainsKey disciplineName then 
+                            {lecturers = commonUniversityCourses.[disciplineName]; practicioners = []}
+                        elif workload.HaveData semester disciplineName then
+                            workload.Teachers semester disciplineName
+                        else
+                            {lecturers = additionalTeachers.[semester].[disciplineName]; practicioners = []}
+
+                    if teachers.practicioners = [] && teachers.lecturers = [] then
+                        failwith "No data!"
+
+                    let rooms = if knownRooms.ContainsKey disciplineName then knownRooms.[disciplineName] else []
+                    let rooms = 
+                        if rooms = [] then 
+                            roomInfo.Rooms semester disciplineName 
+                        else 
+                            makeRoomsMap (curriculum.GetWorkTypes disciplineName semester) rooms
+
+                    if teachers.lecturers <> [] && teachers.practicioners <> [] then
+                        processLectionWithPractices
+                            teachers.lecturers
+                            (curriculum.GetLectionWorkTypes disciplineName semester)
+                            teachers.practicioners
+                            (curriculum.GetPracticeWorkTypes disciplineName semester)
+                            (extendRoomMap rooms (curriculum.GetWorkTypes disciplineName semester))
+                            semester
+                    else
+                        processTypicalRecord
+                            (teachers.lecturers @ teachers.practicioners)
+                            (curriculum.GetWorkTypes disciplineName semester)
+                            (extendRoomMap rooms (curriculum.GetWorkTypes disciplineName semester))
+                            semester
+
+
+
+
+            let rooms = roomInfo.Rooms semester disciplineName
+            let workTypes = curriculum.GetWorkTypes disciplineName semester
+
+            if rooms <> Map.empty then
+                openRecord row
+                addRooms (extendRoomMap rooms workTypes)
+                backToTable ()
+*)
 
 let printCurriculumDisciplines semester =
     let curriculum = DocxCurriculum(Config.curriculumFileName)

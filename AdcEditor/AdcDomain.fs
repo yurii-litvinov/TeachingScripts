@@ -75,7 +75,7 @@ let switchTab tab =
         match tab with
         | Teachers -> click (text "Преподаватели")
         | Software -> click (text "Программное обеспечение по видам работ")
-        | Rooms -> click (text "Помещения для вида работы")
+        | Rooms -> click (text "Study Module Work Kind Rooms")
     )
 
 let openRecord num =

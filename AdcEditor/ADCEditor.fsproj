@@ -27,7 +27,7 @@
     <PackageReference Include="canopy" Version="2.1.5" />
     <PackageReference Include="DocumentFormat.OpenXml" Version="2.12.1" />
     <PackageReference Include="Google.Apis.Sheets.v4" Version="1.49.0.2175" />
-    <PackageReference Include="Selenium.WebDriver.ChromeDriver" Version="87.0.4280.8800" />
+    <PackageReference Include="Selenium.WebDriver.ChromeDriver" Version="90.0.4430.2400" />
   </ItemGroup>
 
   <ItemGroup>

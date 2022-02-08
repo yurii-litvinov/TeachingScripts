@@ -19,7 +19,7 @@ let main _ =
     //logIn ()
 
     //checkRpds "../../5006"
-    createSoftwareReport "../../5006"
+    //createSoftwareReport "../../5006"
 
     //doEverythingRight ()
 
@@ -33,10 +33,9 @@ let main _ =
     //let roomData = RoomData(Config.roomDataSheetId)
     //printfn "%A" (roomData.Rooms 2 "Программирование")
 
-    //autoCorrectRoomsForAll Done 7
-    //autoCorrectRoomsForFirst ()
+    // autoCorrectRoomsForFirst ()
 
-    //autoAddRooms ["405"; "2414"; "2448"]
+    autoAddRooms ["3509"; "2505"]
     
     //autoAddSoftware ["Office "; "Denwer"; "Notepad++"; "TeXstudio"]
 

@@ -59,7 +59,7 @@ type CommissionMember =
     override this.ToString() =
         let degree = if this.Degree = "нет" then "" else this.Degree
         let degree = if degree = "" then "" else degree + ", "
-        $"{this.Name}, {degree}{this.Position}, {this.Company}"
+        $"{this.Name}, {degree}{this.Position}, {this.Company}, {this.Mail}"
 
 type Day =
     { Date: string

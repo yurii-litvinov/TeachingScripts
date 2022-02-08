@@ -260,6 +260,29 @@ let comparePlans oldPlan newPlan =
     |> Seq.filter (fun (o, n) -> (hours o) <> (hours n))
     |> Seq.iter (fun (o, n) -> printfn "%s: часы в %s: %A, в %s: %A" (str o) oldPlan (hours o) newPlan (hours n))
 
+let printSoftware programsFolder =
+    let printSoftForProgram (out: StreamWriter) (program: FileInfo) =
+        let content, _ = parseProgramFile (program.FullName)
+        let generalSoft = "3.3.2. Характеристики аудиторного оборудования, в том числе неспециализированного компьютерного оборудования и программного обеспечения общего пользования"
+        let specialSoft = "3.3.4. Характеристики специализированного программного обеспечения"
+        out.WriteLine $"{program.Name}:"
+        out.WriteLine $"{generalSoft}:"
+        if content.ContainsKey generalSoft then
+            out.WriteLine content.[generalSoft]
+        out.WriteLine ""
+        out.WriteLine $"{specialSoft}:"
+        if content.ContainsKey specialSoft then
+            out.WriteLine content.[specialSoft]
+        out.WriteLine ""
+        out.WriteLine ""
+        ()
+
+    use out = new StreamWriter("softwareReport.txt")
+
+    Directory.EnumerateFiles programsFolder
+    |> Seq.map FileInfo
+    |> Seq.filter (fun p -> excluded (getCode p.Name) |> not)
+    |> Seq.iter (printSoftForProgram out)
 
 let printHelp () =
     printfn "Добро пожаловать в RPD Patcher, утилиту для проверки и автоматических исправлений РПД СПбГУ."
@@ -317,5 +340,6 @@ let main argv =
         | "--remove-competences" -> removeCompetences argv.[1]
         | "--remove-competences-all" -> removeCompetencesInFolder argv.[1]
         | "--compare-plans" -> call comparePlans
+        | "--print-soft" -> printSoftware argv.[1]
         | _ -> printHelp ()
     0
