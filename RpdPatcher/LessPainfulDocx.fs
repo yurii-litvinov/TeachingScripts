@@ -165,10 +165,45 @@ let createHyperlink link (document: WordprocessingDocument) =
     let hyperlink = Hyperlink()
     hyperlink.AppendChild run |> ignore
     hyperlink.Id <- StringValue(rel.Id)
-    hyperlink.History <- OnOffValue.FromBoolean(true)            
+    hyperlink.History <- OnOffValue.FromBoolean(true)
 
     linkParagraph.AppendChild hyperlink |> ignore
     linkParagraph
+
+let createTable (rows: seq<#seq<string>>) =
+    let table = new Table()
+    
+    let tableProperties = new TableProperties()
+
+    let (-+) (element: OpenXmlElement) child =
+        element.AppendChild child |> ignore
+
+    let borders = new TableBorders()
+    tableProperties -+ borders
+
+    borders -+ new TopBorder(Val = new EnumValue<BorderValues>(BorderValues.BasicThinLines), Size = UInt32Value(1u))
+    borders -+ new BottomBorder(Val = new EnumValue<BorderValues>(BorderValues.BasicThinLines), Size = UInt32Value(1u))
+    borders -+ new LeftBorder(Val = new EnumValue<BorderValues>(BorderValues.BasicThinLines), Size = UInt32Value(1u))
+    borders -+ new RightBorder(Val = new EnumValue<BorderValues>(BorderValues.BasicThinLines), Size = UInt32Value(1u))
+    borders -+ new InsideHorizontalBorder(Val = new EnumValue<BorderValues>(BorderValues.BasicThinLines), Size = UInt32Value(1u))
+    borders -+ new InsideVerticalBorder(Val = new EnumValue<BorderValues>(BorderValues.BasicThinLines), Size = UInt32Value(1u))
+
+    table -+ tableProperties
+
+    for row in rows do
+        let tableRow = new TableRow()
+
+        for text in row do
+            let createCell () =
+                let cell = new TableCell()
+                let props = new TableCellProperties(new TableCellWidth(Type = TableWidthUnitValues.Dxa, Width = "2400"))
+                cell -+ props
+                cell -+ createParagraph text Left false false false
+                cell
+
+            tableRow -+ createCell ()
+        table -+ tableRow
+    table
 
 let findParagraph (body: Body) (text: string) =
     let paragraphs = body.Descendants<Paragraph>()

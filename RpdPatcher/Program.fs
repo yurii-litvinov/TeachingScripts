@@ -6,6 +6,7 @@ open LessPainfulGoogleSheets
 open ProgramContentChecker
 open ProgramPatcher
 open System
+open Argu
 
 let plansFolder = "../WorkingPlans"
 
@@ -32,7 +33,7 @@ let isKnownPlanCode planCode =
     Directory.EnumerateFiles plansFolder
     |> Seq.exists (fun f -> planNameToCode f = planCode)
 
-let inventorize planCode programsFolder =
+let inventorize (planCode, programsFolder) =
     let curriculum = DocxCurriculum(planCodeToFileName planCode)
     let disciplines = curriculum.Disciplines
     let programs = 
@@ -128,7 +129,7 @@ let loadDisciplineOwners planCode =
     |> Seq.map (fun (name, owner) -> (name.Substring(1, 6), owner.Split [|' '|] |> Array.item 0))
     |> Map.ofSeq
 
-let autoRename planCode programsFolder force =
+let autoRename (planCode, programsFolder) force =
     let curriculum = DocxCurriculum(planCodeToFileName planCode)
     let disciplines = curriculum.Disciplines
     let owners = loadDisciplineOwners planCode
@@ -140,10 +141,11 @@ let autoRename planCode programsFolder force =
         |> Seq.map FileInfo
 
     programs
-    |> Seq.filter (fun p -> isProgramNameOk p.Name |> not || force = "-f")
+    |> Seq.filter (fun p -> isProgramNameOk p.Name |> not || force)
     |> Seq.filter (fun p -> excluded (getCode p.Name) |> not)
     |> Seq.iter 
         (fun p ->
+            let oldName = p.Name
             let code = p.Name.Substring(0, 6)
             let discipline = findDiscipline code
             if discipline.IsSome then
@@ -164,7 +166,7 @@ let autoRename planCode programsFolder force =
                 else
                     let newName = $"{code}_{name}_{year}_{curriculumCode}_{semesterPart}с_{owner}.docx"
                     p.MoveTo($"{p.DirectoryName}/{newName}")
-                    printfn "Файл '%s' переименован в  '%s'" p.Name newName
+                    printfn "Файл '%s' переименован в  '%s'" oldName newName
             else
                 printfn "Файл '%s' не соответствует ни одной дисциплине из учебного плана" p.Name
         )
@@ -183,23 +185,26 @@ let checkContent programsFolder =
     |> Seq.filter (fun p -> excluded (getCode p.Name) |> not)
     |> Seq.iter (fun p -> checkProgram p.FullName)
 
-let patchPrograms planCode programsFolder =
+let patchPrograms (planCode, programsFolder) =
     Directory.EnumerateFiles programsFolder
     |> Seq.map FileInfo
     |> Seq.filter (fun p -> excluded (getCode p.Name) |> not)
     |> Seq.iter (fun p -> patchProgram (planCodeToFileName planCode) p.FullName)
 
-let patchProgram planCode programFileName =
+let patchProgram (planCode, programFileName) =
     ProgramPatcher.patchProgram (planCodeToFileName planCode) programFileName
 
-let patchYear year programFileName =
+let patchYear (year, programFileName) =
     ProgramPatcher.patchYear year programFileName
 
-let patchYears year programsFolder =
+let addIndicatorsTable (planCode, programFileName) =
+    ProgramPatcher.addIndicatorsTable (planCodeToFileName planCode) programFileName
+
+let patchYears (year, programsFolder) =
     Directory.EnumerateFiles programsFolder
     |> Seq.map FileInfo
     |> Seq.filter (fun p -> excluded (getCode p.Name) |> not)
-    |> Seq.iter (fun p -> patchYear year p.FullName)
+    |> Seq.iter (fun p -> patchYear (year, p.FullName))
 
 let removeCompetences programFileName =
     ProgramPatcher.removeCompetences programFileName
@@ -209,56 +214,6 @@ let removeCompetencesInFolder programsFolder =
     |> Seq.map FileInfo
     |> Seq.filter (fun p -> excluded (getCode p.Name) |> not)
     |> Seq.iter (fun p -> removeCompetences p.FullName)
-
-let comparePlans oldPlan newPlan =
-    let oldCurriculum = DocxCurriculum(planCodeToFileName oldPlan)
-    let newCurriculum = DocxCurriculum(planCodeToFileName newPlan)
-
-    let oldPlanDisciplines = oldCurriculum.Disciplines 
-    let newPlanDisciplines = newCurriculum.Disciplines 
-
-    let sharedDisciplines = oldPlanDisciplines |> Seq.filter (fun d -> newPlanDisciplines |> Seq.exists (fun nd -> d.Code = nd.Code))
-
-    let str (discipline: Discipline) = sprintf "[%s] '%s'" discipline.Code discipline.RussianName
-
-    printfn "Дисциплины плана %s, которых нет в %s:" oldPlan newPlan
-    oldPlanDisciplines |> Seq.filter (fun d -> sharedDisciplines |> Seq.contains d |> not) |> Seq.iter (printfn "%s" << str)
-    printfn ""
-
-    printfn "Дисциплины плана %s, которых нет в %s:" newPlan oldPlan
-    newPlanDisciplines |> Seq.filter (fun d -> sharedDisciplines |> Seq.exists (fun sd -> sd.Code = d.Code) |> not) |> Seq.iter (printfn "%s" << str)
-    printfn ""
-
-    let matchingPairs = sharedDisciplines |> Seq.map (fun d -> (d, newPlanDisciplines |> Seq.find (fun nd -> d.Code = nd.Code)))
-
-    let laborIntensity (discipline: Discipline) = discipline.Implementations |> Seq.sumBy (fun i -> i.LaborIntensity)
-    let attestationTypes (discipline: Discipline) = discipline.Implementations |> Seq.map (fun i -> i.MonitoringTypes) |> Seq.toList
-    let semesters (discipline: Discipline) = discipline.Implementations |> Seq.map (fun i -> i.Semester) |> Seq.toList
-    let hours (discipline: Discipline) = discipline.Implementations |> Seq.map (fun i -> i.WorkHours) |> Seq.toList
-
-    printfn ""
-    printfn "Разница в трудоёмкости:"
-    matchingPairs 
-    |> Seq.filter (fun (o, n) -> (laborIntensity o) <> (laborIntensity n))
-    |> Seq.iter (fun (o, n) -> printfn "%s: трудоёмкость в %s: %d, в %s: %d" (str o) oldPlan (laborIntensity o) newPlan (laborIntensity n))
-
-    printfn ""
-    printfn "Разница в семестрах реализации:"
-    matchingPairs 
-    |> Seq.filter (fun (o, n) -> (semesters o) <> (semesters n))
-    |> Seq.iter (fun (o, n) -> printfn "%s: семестры в %s: %A, в %s: %A" (str o) oldPlan (semesters o) newPlan (semesters n))
-
-    printfn ""
-    printfn "Разница в форме аттестации:"
-    matchingPairs 
-    |> Seq.filter (fun (o, n) -> (attestationTypes o) <> (attestationTypes n))
-    |> Seq.iter (fun (o, n) -> printfn "%s: формы аттестации в %s: %A, в %s: %A" (str o) oldPlan (attestationTypes o) newPlan (attestationTypes n))
-
-    printfn ""
-    printfn "Разница в часах:"
-    matchingPairs 
-    |> Seq.filter (fun (o, n) -> (hours o) <> (hours n))
-    |> Seq.iter (fun (o, n) -> printfn "%s: часы в %s: %A, в %s: %A" (str o) oldPlan (hours o) newPlan (hours n))
 
 let printSoftware programsFolder =
     let printSoftForProgram (out: StreamWriter) (program: FileInfo) =
@@ -284,6 +239,24 @@ let printSoftware programsFolder =
     |> Seq.filter (fun p -> excluded (getCode p.Name) |> not)
     |> Seq.iter (printSoftForProgram out)
 
+let printAuthors programsFolder =
+    let printAuthorsForProgram (out: StreamWriter) (program: FileInfo) =
+        let content, _ = parseProgramFile (program.FullName)
+        let authors = "Раздел 4. Разработчики программы"
+        out.WriteLine $"{program.Name}:"
+        if content.ContainsKey authors then
+            out.WriteLine content.[authors]
+        out.WriteLine ""
+        out.WriteLine ""
+        ()
+
+    use out = new StreamWriter("authorsReport.txt")
+
+    Directory.EnumerateFiles programsFolder
+    |> Seq.map FileInfo
+    |> Seq.filter (fun p -> excluded (getCode p.Name) |> not)
+    |> Seq.iter (printAuthorsForProgram out)
+
 let printHelp () =
     printfn "Добро пожаловать в RPD Patcher, утилиту для проверки и автоматических исправлений РПД СПбГУ."
     printfn "Использование:"
@@ -307,39 +280,88 @@ let printHelp () =
     |> Seq.map (fun p -> FileInfo(p).Name.Substring(3, "9999-2084".Length))
     |> Seq.iter (printf "%s ")
 
+type Arguments =
+    | [<AltCommandLine("-i")>] Inventorize of plan: string * programsFolder: string
+    | [<AltCommandLine("-r")>] Auto_Rename of plan: string * programsFolder: string
+    | Delete_Excluded of programsFolder: string
+    | [<AltCommandLine("-c")>] Check_Content of programsFolder: string
+    | [<AltCommandLine("-cp")>] Check_Program of programFileName: string
+    | [<AltCommandLine("-p")>] Patch of plan: string * programsFolder: string
+    | [<AltCommandLine("-pp")>] Patch_Program of plan: string * programFileName: string
+    | Patch_Year of year: string * programFileName: string
+    | Patch_Years of year: string * programsFolder: string
+    | Remove_Competences of programFileName: string
+    | Remove_Competences_All of programsFolder: string
+    | Print_Soft of programsFolder: string
+    | Print_Authors of programsFolder: string
+    | Add_Indicators_Table of plan: string * programFileName: string
+    | [<AltCommandLine("-f")>] Force
+with
+    interface IArgParserTemplate with
+        member arg.Usage =
+            match arg with
+            | Inventorize _ -> "проверить, что все РПД в наличии и канонично называются."
+            | Auto_Rename _ -> "автоматически переименовать РПД, если их имена не в каноничном формате. Требует авторизации в Google Drive."
+            | Delete_Excluded _ -> "удалить из папки все РПД, перечисленные в списке 'исключённые' в конфиге. Используйте с осторожностью!"
+            | Check_Content _ -> "проверить структуру и содержимое всех РПД в папке. Проверяет следование приказу 539/1 от 17.02.2014 о форме РПД, ищет нарушения приказа 1395/1 и типичные ошибки."
+            | Check_Program _ -> "как '-c', только для одной РПД."
+            | Patch _ -> "автомагически исправляет типичные ошибки во всех РПД в папке и приводит их в соответствие приказу 1395/1. После этого ТРЕБУЕТСЯ ручная проверка!"
+            | Patch_Program _ -> "как '-p', только для одной РПД."
+            | Patch_Year _ -> "меняет в указанной РПД год на титульнике на заданный."
+            | Patch_Years _ -> "меняет во всех РПД в папке год на титульнике на заданный."
+            | Remove_Competences _ -> "Удаляет компетенции из контрольно-оценочных материалов для данной РПД."
+            | Remove_Competences_All _ -> "Удаляет компетенции из контрольно-оценочных материалов для всех РПД в папке."
+            | Print_Soft _ -> "Печатает требуемое программное обеспечение, специализированное и общего назначения, для каждой РПД в папке."
+            | Print_Authors _ -> "Печатает автора/авторов (как указано в разделе 4) для всех РПД в папке."
+            | Add_Indicators_Table _ -> "Добавляет шаблон таблицы с индикаторами, с компетенциями из учебного плана."
+            | Force -> "Заставляет команду работать агрессивнее (применяется только для -r, переименует файлы, даже если они соответствуют стилю именования)."
+
 [<EntryPoint>]
 let main argv =
-    if argv.Length < 2 then
-        printHelp ()
-    else
-        let call f =
-            if argv.Length < 3 then
-                printHelp ()
-            else
-                f argv.[1] argv.[2]
+    let errorHandler = ProcessExiter(colorizer = function ErrorCode.HelpText -> None | _ -> Some ConsoleColor.Red)
+    let parser = ArgumentParser.Create<Arguments>(programName = "RpdPatcher", errorHandler = errorHandler)
+    let args = parser.ParseCommandLine argv
 
-        let call3 f =
-            if argv.Length < 3 then
-                printHelp ()
-            elif argv.Length = 3 then 
-                f argv.[1] argv.[2] ""
-            elif argv.Length = 4 then
-                f argv.[1] argv.[2] argv.[3]
+    if (args.Contains Inventorize) then
+        inventorize (args.GetResult Inventorize)
 
-        
-        match argv.[0] with
-        | "--inventorize" | "-i" -> call inventorize 
-        | "--auto-rename" | "-r" -> call3 autoRename
-        | "--delete-excluded" -> deleteExcluded argv.[1]
-        | "--check-content" | "-c" -> checkContent argv.[1]
-        | "--check-program" | "-cp" -> checkProgram argv.[1]
-        | "--patch" | "-p" -> call patchPrograms
-        | "--patch-program" | "-pp" -> call patchProgram
-        | "--patch-year" -> call patchYear
-        | "--patch-years" -> call patchYears
-        | "--remove-competences" -> removeCompetences argv.[1]
-        | "--remove-competences-all" -> removeCompetencesInFolder argv.[1]
-        | "--compare-plans" -> call comparePlans
-        | "--print-soft" -> printSoftware argv.[1]
-        | _ -> printHelp ()
+    if (args.Contains Auto_Rename) then
+        autoRename (args.GetResult Auto_Rename) (args.Contains Force)
+
+    if (args.Contains Delete_Excluded) then
+        deleteExcluded (args.GetResult Delete_Excluded)
+
+    if (args.Contains Check_Content) then
+        checkContent (args.GetResult Check_Content)
+
+    if (args.Contains Check_Program) then
+        checkProgram (args.GetResult Check_Program)
+
+    if (args.Contains Patch) then
+        patchPrograms (args.GetResult Patch)
+
+    if (args.Contains Patch_Program) then
+        patchProgram (args.GetResult Patch_Program)
+
+    if (args.Contains Patch_Year) then
+        patchYear (args.GetResult Patch_Year)
+
+    if (args.Contains Patch_Years) then
+        patchYears (args.GetResult Patch_Years)
+
+    if (args.Contains Remove_Competences) then
+        removeCompetences (args.GetResult Remove_Competences)
+
+    if (args.Contains Remove_Competences_All) then
+        removeCompetencesInFolder (args.GetResult Remove_Competences_All)
+
+    if (args.Contains Print_Soft) then
+        printSoftware (args.GetResult Print_Soft)
+
+    if (args.Contains Print_Authors) then
+        printAuthors (args.GetResult Print_Authors)
+
+    if (args.Contains Add_Indicators_Table) then
+        addIndicatorsTable (args.GetResult Add_Indicators_Table)
+    
     0
