@@ -1,1 +1,1 @@
-fsi %~dp0/clone.fsx %*
+dotnet fsi %~dp0/clone.fsx %*
