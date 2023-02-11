@@ -1,7 +1,6 @@
-let spreadsheetId = "1sRclQ1HRUN8_hnky0XOeVMehipZJue6CRvY6vW646gk"
-let dataFileName = "reinstatementPretendents.xlsx"
+let spreadsheetId = "1nyOe9VRPyAGdthXdJKmLBWFhYBu2VycEI-4gv9MjdHo"
+let dataFileName = "pretendents.xlsx"
 let tabName = "Список полный"
-
 
 #r "nuget: Google.Apis.Sheets.v4"
 #r "nuget: DocumentFormat.OpenXml"
@@ -42,7 +41,7 @@ let collectData () =
     let merged = 
         Seq.zip3 names programmes courses 
         |> Seq.zip statementTypes
-        |> Seq.map (fun (st, (n, p, c)) -> (n, p, c, st))
+        |> Seq.map (fun (st, (n, p, c)) -> (n.Trim(), p.Replace('\n', ' ').Trim(), c, st))
 
     let combined = merged |> Seq.groupBy (fun (n, _, _, _) -> n)
     let result = combined |> Seq.map (fun (name, statements) -> { Name = name; Statements = formStatements statements})
@@ -54,18 +53,18 @@ let service = openGoogleSheet "TeachingScripts"
 
 let namesColumn = data |> Seq.map (fun student -> student.Name)
 
-let smartFold selector =
+let smartFold selector lineBreak =
     let smartReduce data =
         if data |> Seq.distinct |> Seq.length = 1 then
             data |> Seq.head
         else
-            data |> Seq.reduce (fun acc el -> acc + ", " + el)
+            data |> Seq.reduce (fun acc el -> $"{acc},{if lineBreak then '\n' else ' '}{el}")
 
     data |> Seq.map (fun student -> student.Statements |> Seq.map selector |> smartReduce)
 
-let programmesColumn = smartFold (fun st -> st.Programme)
-let coursesColumn = smartFold (fun st -> st.Course)
-let statementTypeColumn = smartFold (fun st -> st.StatementType)
+let programmesColumn = smartFold (fun st -> st.Programme) true
+let coursesColumn = smartFold (fun st -> st.Course) false
+let statementTypeColumn = smartFold (fun st -> st.StatementType) true
 
 writeGoogleSheetColumn service spreadsheetId "Сортированные по алфавиту" "A" 2 namesColumn
 writeGoogleSheetColumn service spreadsheetId "Сортированные по алфавиту" "C" 2 programmesColumn
