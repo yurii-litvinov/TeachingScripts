@@ -1,1 +1,1 @@
-dotnet fsi /home/ylitvinov/.local/bin/clone.fsx $*
+dotnet fsi /home/ylitvinov/.local/bin/clone.fsx -- $*
