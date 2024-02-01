@@ -1,5 +1,5 @@
 let yandexSheetFolderUrl =
-    @"https://disk.yandex.ru/client/disk/Административная%20деятельность%20СПбГУ/Комиссия%20по%20переводам%20и%20восстановлениям/2023%2C%20лето"
+    @"https://disk.yandex.ru/client/disk/Административная%20деятельность%20СПбГУ/Комиссия%20по%20переводам%20и%20восстановлениям/2024%2C%20зима"
 
 let yandexSheetFileName = @"Оценки"
 
@@ -7,7 +7,7 @@ let dataFileName = "pretendents.xlsx"
 let tabName = "Список полный"
 
 #r "nuget: Google.Apis.Sheets.v4"
-#r "nuget: DocumentFormat.OpenXml"
+#r "nuget: DocumentFormat.OpenXml, 2.20.0"
 #r "nuget: FSharp.Json"
 
 #load "DocUtils/DocUtils/XlsxUtils.fs"
@@ -51,9 +51,9 @@ let collectData () =
     let level =
         function
         | "бакалавриат" -> Bachelor
-        | "магистр" -> Master
+        | "магистр" | "магистратура" -> Master
         | "специалитет" -> Specialist
-        | _ -> failwith "Неизвестный уровень образования"
+        | s -> failwithf "Неизвестный уровень образования '%s'" s
 
     let names = readAndClean 1
     let programmes = readAndClean 2
@@ -120,8 +120,6 @@ try
     yandexSpreadsheet.SaveAsync() |> Async.AwaitTask |> Async.RunSynchronously
 with ServerCommunicationException(response) ->
     printf "Сервер вернул ошибку %s" response
-
-
 
 /// Статистика поданных заявлений по образовательным программам, курсам и бюджет/договор
 type ReportByProgrammes =
