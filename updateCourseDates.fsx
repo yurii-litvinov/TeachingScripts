@@ -1,10 +1,10 @@
 let holidays = ["23.02.2024"; "08.03.2024"; "01.05.2024"; "09.05.2024"; "12.06.2024"; "04.11.2024"]
 let startDate = "13.02.2024"
 let finishDate = "30.05.2024"
-let spreadsheetPath = "https://disk.yandex.ru/client/disk/Курсы/ТРПО"
-let spreadsheetName = "ТРПО, программа курса"
+let spreadsheetPath = "https://disk.yandex.ru/client/disk/Курсы/Проектирование%20и%20архитектура%20ПО"
+let spreadsheetName = "Проектирование и архитектура ПО, программа"
 let datePos = {| row = 2; column = "B" |}
-let sheetName = "Лист1"
+let sheetName = "Sheet1"
 
 #r "nuget:DocumentFormat.OpenXml, 2.20.0"
 #r "nuget:FSharp.Json"
