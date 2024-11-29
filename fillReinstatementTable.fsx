@@ -1,13 +1,21 @@
+/// URL of a folder with table on Yandex Disk.
 let yandexSheetFolderUrl =
-    @"https://disk.yandex.ru/client/disk/Административная%20деятельность%20СПбГУ/Комиссия%20по%20переводам%20и%20восстановлениям/2023%2C%20лето"
+    @"https://disk.yandex.ru/client/disk/Административная%20деятельность%20СПбГУ/Комиссия%20по%20переводам%20и%20восстановлениям/2024%2C%20осень"
 
+/// File name (without extension) of a table in Yandex Disk.
 let yandexSheetFileName = @"Оценки"
 
-let dataFileName = "pretendents.xlsx"
+/// File name (with extension) of an input .xlsx table with applicants.
+let dataFileName = "applicants.xlsx"
+
+/// Tab name within applicants table.
 let tabName = "Список полный"
 
+/// True if we actually need to modify Yandex Sheet table, false if we only want to calculate statistics.
+let dryRun = true
+
 #r "nuget: Google.Apis.Sheets.v4"
-#r "nuget: DocumentFormat.OpenXml"
+#r "nuget: DocumentFormat.OpenXml, 2.20.0"
 #r "nuget: FSharp.Json"
 
 #load "DocUtils/DocUtils/XlsxUtils.fs"
@@ -35,8 +43,8 @@ type Student =
 let collectData () =
     let sheet = Spreadsheet.FromFile(dataFileName).Sheet(tabName)
 
-    let readAndClean (columnIndex: int) =
-        sheet.Column columnIndex |> Seq.skip 3 |> Seq.filter ((<>) "")
+    let readAndClean (column: string) =
+        sheet.Column column |> Seq.skip 3 |> Seq.filter ((<>) "")
 
     let formStatements (statements: (string * string * string * Level * string * string) seq) =
         statements
@@ -51,16 +59,16 @@ let collectData () =
     let level =
         function
         | "бакалавриат" -> Bachelor
-        | "магистр" -> Master
+        | "магистр" | "магистратура" -> Master
         | "специалитет" -> Specialist
-        | _ -> failwith "Неизвестный уровень образования"
+        | s -> failwithf "Неизвестный уровень образования '%s'" s
 
-    let names = readAndClean 1
-    let programmes = readAndClean 2
-    let levels = readAndClean 3
-    let courses = readAndClean 4
-    let statementTypes = readAndClean 5
-    let sources = readAndClean 8
+    let names = readAndClean "B"
+    let programmes = readAndClean "C"
+    let levels = readAndClean "D"
+    let courses = readAndClean "E"
+    let statementTypes = readAndClean "F"
+    let sources = readAndClean "H"
 
     let merged =
         Seq.zip3 names programmes courses
@@ -83,45 +91,47 @@ let collectData () =
 
 let data = collectData ()
 
-let namesColumn = data |> Seq.map (fun student -> student.Name)
+if dryRun |> not then
+    let namesColumn = data |> Seq.map (fun student -> student.Name)
 
-let smartFold selector lineBreak =
-    let smartReduce data =
-        if data |> Seq.distinct |> Seq.length = 1 then
-            data |> Seq.head
-        else
-            data
-            |> Seq.reduce (fun acc el -> $"{acc},{if lineBreak then '\n' else ' '}{el}")
+    let smartFold selector lineBreak =
+        let smartReduce data =
+            if data |> Seq.distinct |> Seq.length = 1 then
+                data |> Seq.head
+            else
+                data
+                |> Seq.reduce (fun acc el -> $"{acc},{if lineBreak then '\n' else ' '}{el}")
 
-    data
-    |> Seq.map (fun student -> student.Statements |> Seq.map selector |> smartReduce)
+        data
+        |> Seq.map (fun student -> student.Statements |> Seq.map selector |> smartReduce)
 
-let programmesColumn = smartFold (fun st -> st.Programme) true
+    let programmesColumn = smartFold _.Programme true
 
-let coursesColumn =
-    smartFold (fun st -> st.Course + (if st.Level = Master then " (магистр)" else "")) false
+    let coursesColumn =
+        smartFold (fun st -> st.Course + (if st.Level = Master then " (магистр)" else "")) false
 
-let statementTypeColumn = smartFold (fun st -> st.StatementType) true
+    let statementTypeColumn = smartFold _.StatementType true
 
-let service = YandexService.FromClientSecretsFile()
+    let service = YandexService.FromClientSecretsFile()
 
-let yandexSpreadsheet =
-    service
-        .GetSpreadsheetByFolderAndFileNameAsync(yandexSheetFolderUrl, yandexSheetFileName)
-        .Result
+    let yandexSpreadsheet =
+        service
+            .GetSpreadsheetByFolderAndFileNameAsync(yandexSheetFolderUrl, yandexSheetFileName)
+            .Result
 
-let sheet = yandexSpreadsheet.Sheet "Сортированные по алфавиту"
-sheet.WriteColumn 0 1 namesColumn
-sheet.WriteColumn 2 1 programmesColumn
-sheet.WriteColumn 3 1 coursesColumn
-sheet.WriteColumn 4 1 statementTypeColumn
+    let sheet = yandexSpreadsheet.Sheet "Сортированные по алфавиту"
+    sheet.WriteColumn "A" 1 namesColumn
+    sheet.WriteColumn "C" 1 programmesColumn
+    sheet.WriteColumn "D" 1 coursesColumn
+    sheet.WriteColumn "E" 1 statementTypeColumn
 
-try
-    yandexSpreadsheet.SaveAsync() |> Async.AwaitTask |> Async.RunSynchronously
-with ServerCommunicationException(response) ->
-    printf "Сервер вернул ошибку %s" response
-
-
+    try
+        yandexSpreadsheet.SaveAsync() |> Async.AwaitTask |> Async.RunSynchronously
+    with ServerCommunicationException(response) ->
+        printf "Сервер вернул ошибку %s" response
+else
+    printfn "dryRun выставлен в true, таблица на Яндекс.Диске не была модифицирована!"
+    printfn ""
 
 /// Статистика поданных заявлений по образовательным программам, курсам и бюджет/договор
 type ReportByProgrammes =
@@ -136,7 +146,7 @@ let reportByProgrammes () =
         student.Statements
         |> List.fold
             (fun reports statement ->
-                { Programme = statement.Programme.Substring(0, "СВ.5162".Length)
+                { Programme = statement.Programme.Substring(0, "02.03.03".Length)
                   Course = statement.Course
                   BudgetStatements = if statement.StatementType = "бюджет" then 1 else 0
                   PaidStatements = if statement.StatementType = "договор" then 1 else 0 }
@@ -190,7 +200,7 @@ let reports = reportByProgrammes ()
 let printReport (programmeName: string, programmeReport: ReportByProgrammes list) =
     printfn "%s: " programmeName
 
-    let programmeReport = programmeReport |> List.sortBy (fun r -> r.Course)
+    let programmeReport = programmeReport |> List.sortBy _.Course
 
     programmeReport
     |> List.iter (fun r ->
@@ -198,36 +208,36 @@ let printReport (programmeName: string, programmeReport: ReportByProgrammes list
 
     printfn
         "Всего, бюджет: %d, договор: %d"
-        (programmeReport |> List.sumBy (fun r -> r.BudgetStatements))
-        (programmeReport |> List.sumBy (fun r -> r.PaidStatements))
+        (programmeReport |> List.sumBy _.BudgetStatements)
+        (programmeReport |> List.sumBy _.PaidStatements)
 
 reports
-|> List.sortBy (fun p -> p.Programme)
-|> List.groupBy (fun p -> p.Programme)
+|> List.sortBy _.Programme
+|> List.groupBy _.Programme
 |> List.iter printReport
 
 printfn ""
 
 printfn
     "Всего, бюджет: %d, договор: %d"
-    (reports |> List.sumBy (fun r -> r.BudgetStatements))
-    (reports |> List.sumBy (fun r -> r.PaidStatements))
+    (reports |> List.sumBy _.BudgetStatements)
+    (reports |> List.sumBy _.PaidStatements)
 
 /// Отчётность по тому, откуда заявление — перевод, восстановление, другой вуз и т.п.
 let totalSources =
     data
-    |> Seq.map (fun student -> student.Statements)
+    |> Seq.map _.Statements
     |> Seq.concat
-    |> Seq.countBy (fun statement -> statement.Source)
+    |> Seq.countBy _.Source
 
 printfn "Всего кто откуда: "
 
 totalSources |> Seq.iter (fun (key, value) -> printf "%s: %d, " key value)
 
 data
-|> Seq.map (fun student -> student.Statements)
+|> Seq.map _.Statements
 |> Seq.concat
-|> Seq.groupBy (fun s -> s.Programme.Substring(0, "СВ.5162".Length))
+|> Seq.groupBy _.Programme.Substring(0, "02.03.03".Length)
 |> Seq.sortBy fst
 |> Seq.map (fun (p, s) -> (p, s |> Seq.countBy (fun statement -> statement.Source)))
 |> Seq.iter (fun (p, statistics) ->
@@ -235,7 +245,7 @@ data
     statistics |> Seq.iter (fun (key, value) -> printf "%s: %d, " key value))
 
 let uniqueStudentsFromOtherUniversities =
-    data |> Seq.filter (fun s -> s.Statements.Head.Source = "др ВУЗ") |> Seq.length
+    data |> Seq.filter (fun s -> s.Statements.Head.Source = "другой ВУЗ") |> Seq.length
 
 printfn ""
 printfn "Всего студентов из других вузов: %d" uniqueStudentsFromOtherUniversities

@@ -7,11 +7,13 @@
 
   <ItemGroup>
     <Compile Include="CurriculumUtils.fs" />
+    <Compile Include="UseCases.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Google.Apis.Sheets.v4" Version="1.50.0.2245" />
+    <PackageReference Include="Argu" Version="6.2.4" />
+    <PackageReference Include="Google.Apis.Sheets.v4" Version="1.68.0.3484" />
   </ItemGroup>
 
   <ItemGroup>
