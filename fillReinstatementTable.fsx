@@ -11,7 +11,7 @@ let dataFileName = "applicants.xlsx"
 /// Tab name within applicants table.
 let tabName = "Список полный"
 
-/// True if we actually need to modify Yandex Sheet table, false if we only want to calculate statistics.
+/// False if we actually need to modify Yandex Sheet table, true if we only want to calculate statistics.
 let dryRun = true
 
 #r "nuget: Google.Apis.Sheets.v4"
@@ -146,7 +146,7 @@ let reportByProgrammes () =
         student.Statements
         |> List.fold
             (fun reports statement ->
-                { Programme = statement.Programme.Substring(0, "02.03.03".Length)
+                { Programme = statement.Programme //.Substring(0, "02.03.03".Length)
                   Course = statement.Course
                   BudgetStatements = if statement.StatementType = "бюджет" then 1 else 0
                   PaidStatements = if statement.StatementType = "договор" then 1 else 0 }
@@ -161,7 +161,7 @@ let reportByProgrammes () =
                   Course = first.Course
                   BudgetStatements = first.BudgetStatements + second.BudgetStatements
                   PaidStatements = first.PaidStatements + second.PaidStatements }
-            | _ -> failwith "Слишком много разных видов заявлений на один курс и программу, так вообще не должно быть")
+            | _ -> failwithf "Слишком много разных видов заявлений на один курс и программу, так вообще не должно быть (Студент %s)" student.Name)
 
     let addReports (reports1: ReportByProgrammes list) (reports2: ReportByProgrammes list) =
         let mergedReports =
@@ -210,6 +210,8 @@ let printReport (programmeName: string, programmeReport: ReportByProgrammes list
         "Всего, бюджет: %d, договор: %d"
         (programmeReport |> List.sumBy _.BudgetStatements)
         (programmeReport |> List.sumBy _.PaidStatements)
+    
+    printfn ""
 
 reports
 |> List.sortBy _.Programme
@@ -242,10 +244,12 @@ data
 |> Seq.map (fun (p, s) -> (p, s |> Seq.countBy (fun statement -> statement.Source)))
 |> Seq.iter (fun (p, statistics) ->
     printf "\n%s: " p
-    statistics |> Seq.iter (fun (key, value) -> printf "%s: %d, " key value))
+    statistics |> Seq.sortBy fst |> Seq.iter (fun (key, value) -> printf "%s: %d, " key value))
 
 let uniqueStudentsFromOtherUniversities =
-    data |> Seq.filter (fun s -> s.Statements.Head.Source = "другой ВУЗ") |> Seq.length
+    data |> Seq.filter (fun s -> s.Statements.Head.Source = "др ВУЗ") |> Seq.length
 
 printfn ""
+printfn ""
+printfn "Всего студентов: %d" (data |> Seq.length)
 printfn "Всего студентов из других вузов: %d" uniqueStudentsFromOtherUniversities
