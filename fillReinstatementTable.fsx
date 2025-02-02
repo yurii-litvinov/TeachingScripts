@@ -234,12 +234,12 @@ let totalSources =
 
 printfn "Всего кто откуда: "
 
-totalSources |> Seq.iter (fun (key, value) -> printf "%s: %d, " key value)
+totalSources |> Seq.sortBy fst |> Seq.iter (fun (key, value) -> printf "%s: %d, " key value)
 
 data
 |> Seq.map _.Statements
 |> Seq.concat
-|> Seq.groupBy _.Programme.Substring(0, "02.03.03".Length)
+|> Seq.groupBy _.Programme
 |> Seq.sortBy fst
 |> Seq.map (fun (p, s) -> (p, s |> Seq.countBy (fun statement -> statement.Source)))
 |> Seq.iter (fun (p, statistics) ->
