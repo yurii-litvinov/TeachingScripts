@@ -1,8 +1,8 @@
-let holidays = ["23.02.2024"; "08.03.2024"; "01.05.2024"; "09.05.2024"; "12.06.2024"; "04.11.2024"]
-let startDate = "13.02.2024"
-let finishDate = "30.05.2024"
-let spreadsheetPath = "https://disk.yandex.ru/client/disk/Курсы/Проектирование%20и%20архитектура%20ПО"
-let spreadsheetName = "Проектирование и архитектура ПО, программа"
+let holidays = ["08.03.2025"; "01.05.2025"; "08.05.2025"; "09.05.2025"; "12.06.2025"; "04.11.2025"; "31.12.2025"]
+let startDate = "17.02.2025"
+let finishDate = "30.05.2025"
+let spreadsheetPath = "https://disk.yandex.ru/client/disk/Курсы/Проектирование%20ПО%2C%20ВШЭ%20и%20ИТМО"
+let spreadsheetName = "Проектирование ПО, ВШЭ, программа"
 let datePos = {| row = 2; column = "B" |}
 let sheetName = "Sheet1"
 
@@ -17,7 +17,7 @@ open DocUtils.YandexSheets
 let convertedStartDate = DateTime.Parse startDate
 
 let courseDates = 
-    Seq.initInfinite (fun i -> convertedStartDate + (TimeSpan.FromDays <| float (i * 7)))
+    Seq.initInfinite (fun i -> convertedStartDate + (float (i * 7) |> TimeSpan.FromDays))
     |> Seq.map (fun date -> date.ToShortDateString())
     |> Seq.except holidays
     |> Seq.takeWhile (fun date -> (DateTime.Parse date) <= (DateTime.Parse finishDate))
