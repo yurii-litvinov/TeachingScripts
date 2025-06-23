@@ -1,16 +1,8 @@
-﻿module UseCases
+﻿module ComparePlans
 
-open System.IO
+open CommonUtils
+
 open CurriculumParser
-
-let plansFolder = "../WorkingPlans"
-
-let planNameToCode fileName =
-    FileInfo(fileName).Name.Substring(3, "9999-2084".Length)
-
-let planCodeToFileName planCode =
-    Directory.EnumerateFiles (System.AppDomain.CurrentDomain.BaseDirectory + "/../../../" + plansFolder)
-    |> Seq.find (fun f -> planNameToCode f = planCode)
 
 let compareToSemester oldPlan newPlan semester =
     let oldCurriculum = DocxCurriculum(planCodeToFileName oldPlan)
@@ -85,18 +77,3 @@ let compareToSemester oldPlan newPlan semester =
 
 let comparePlans oldPlan newPlan =
     compareToSemester oldPlan newPlan 8
-
-let printBySemester plan semester =
-    let printDiscipline (discipline: Discipline) =
-        let implementation = discipline.Implementations |> Seq.find (fun i -> i.Semester = int semester)
-        let workHours = implementation.WorkHours.Split(' ')
-        let lectures = int workHours[0]
-        let practices = [1; 3; 4; 5] |> List.map (fun i -> int workHours[i]) |> List.sum
-        let homework = int workHours[9] + int workHours[11]
-        printfn "[%s] %s\t%i\t%i\t%i" discipline.Code discipline.RussianName lectures practices homework
-
-    let curriculum = DocxCurriculum(planCodeToFileName plan)
-    curriculum.Disciplines
-    |> Seq.filter (fun d -> d.Implementations |> Seq.exists (fun i -> i.Semester = int semester))
-    |> Seq.sortBy (fun d -> d.Code)
-    |> Seq.iter (fun d -> printDiscipline d)
